@@ -145,6 +145,17 @@ docker-compose up -d
 
 ### 配置说明
 
+#### 初始配置
+
+在首次运行前，请从模板创建配置文件:
+
+```bash
+cp configs/server.template.yaml configs/server.yaml
+cp configs/agent.template.yaml configs/agent.yaml
+```
+
+然后根据您的环境编辑这些文件。
+
 #### 主控端配置
 
 配置文件位于`configs/server.yaml`，主要配置项包括：
@@ -194,6 +205,7 @@ collection:
 ### 运行服务
 
 #### 直接运行
+
 
 1. 运行主控端：
 
