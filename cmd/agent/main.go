@@ -82,8 +82,13 @@ func main() {
 
 	// 初始化指标收集器
 	// systemCollector := collector.NewSystemCollector()
-	systemCollector := collector.NewParallelCollector()
+	systemCollector := collector.NewParallelCollector(
+		collector.WithMountPoints(agentConfig.Collection.Disk.MountPoints),
+		collector.WithInterfaces(agentConfig.Collection.Network.Interfaces),
+	)
 	log.Println("系统指标收集器初始化完成(并行收集模式)")
+	log.Printf("监控磁盘挂载点: %v", agentConfig.Collection.Disk.MountPoints)
+	log.Printf("监控网络接口: %v", agentConfig.Collection.Network.Interfaces)
 
 	// 如果不是调试模式，则初始化上报模块
 	var metricsReporter reporter.Reporter
@@ -211,7 +216,42 @@ func loadConfig(path string) (*config.AgentConfig, error) {
 		return nil, err
 	}
 
+	// 确保关键配置有默认值
+	ensureDefaultConfig(&cfg)
+
 	return &cfg, nil
+}
+
+// ensureDefaultConfig 确保关键配置项有合理的默认值
+func ensureDefaultConfig(cfg *config.AgentConfig) {
+	// 确保磁盘挂载点配置
+	if len(cfg.Collection.Disk.MountPoints) == 0 {
+		cfg.Collection.Disk.MountPoints = []string{"/"}
+	}
+
+	// 确保网络接口配置（空切片表示所有接口）
+	if cfg.Collection.Network.Interfaces == nil {
+		cfg.Collection.Network.Interfaces = []string{}
+	}
+
+	// 确保采集间隔合理
+	if cfg.Collection.Interval <= 0 {
+		cfg.Collection.Interval = 500 // 默认500毫秒
+	}
+
+	// 确保重试设置合理
+	if cfg.Server.RetryCount <= 0 {
+		cfg.Server.RetryCount = 3
+	}
+
+	if cfg.Server.RetryInterval <= 0 {
+		cfg.Server.RetryInterval = 1
+	}
+
+	// 确保超时时间合理
+	if cfg.Server.Timeout <= 0 {
+		cfg.Server.Timeout = 10
+	}
 }
 
 // collectAndReport 收集并上报系统指标
@@ -234,8 +274,25 @@ func collectAndReport(collector collector.Collector, reporter reporter.Reporter,
 		// 调试模式，只打印关键指标
 		log.Printf("CPU使用率: %.2f%%\n", stats.CPU["usage"])
 		log.Printf("内存使用率: %.2f%%\n", stats.Memory.UsedPercent)
+
+		// 磁盘信息
 		log.Printf("收集到 %d 个磁盘分区信息\n", len(stats.Disk))
+		for mountPoint, diskInfo := range stats.Disk {
+			log.Printf("  - 挂载点: %s, 使用率: %.2f%%, 总空间: %.2f GB\n",
+				mountPoint,
+				diskInfo.UsedPercent,
+				float64(diskInfo.Total)/(1024*1024*1024))
+		}
+
+		// 网络信息
 		log.Printf("收集到 %d 个网络接口信息\n", len(stats.Network.Interfaces))
+		for iface, netInfo := range stats.Network.Interfaces {
+			log.Printf("  - 接口: %s, 上传速度: %.2f KB/s, 下载速度: %.2f KB/s\n",
+				iface,
+				float64(netInfo.UploadSpeed)/1024,
+				float64(netInfo.DownloadSpeed)/1024)
+		}
+
 		log.Printf("TCP连接数: %d, UDP连接数: %d\n",
 			stats.Network.TCPConnCount, stats.Network.UDPConnCount)
 		log.Printf("IP地址: 公网IPv4=%v, 内网IPv4=%v\n",

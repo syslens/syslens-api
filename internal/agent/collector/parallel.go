@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"time"
 
+	"log"
+
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
@@ -150,29 +152,44 @@ func (pc *ParallelCollector) collectDiskInfo(stats *SystemStats) {
 	var diskMutex sync.Mutex
 	var diskWg sync.WaitGroup
 
+	// 检查挂载点配置是否有效
+	if len(pc.mountPoints) == 0 {
+		log.Printf("警告: 没有配置任何磁盘挂载点，将使用默认的根目录('/')")
+		pc.mountPoints = []string{"/"}
+	}
+
 	// 对每个挂载点并行收集
 	for _, mountPoint := range pc.mountPoints {
 		diskWg.Add(1)
 		go func(mount string) {
 			defer diskWg.Done()
 
-			if diskStat, err := disk.Usage(mount); err == nil {
-				// 安全更新共享的map
-				diskMutex.Lock()
-				stats.Disk[mount] = DiskStats{
-					Total:       diskStat.Total,
-					Used:        diskStat.Used,
-					Free:        diskStat.Free,
-					UsedPercent: diskStat.UsedPercent,
-					FSType:      diskStat.Fstype,
-				}
-				diskMutex.Unlock()
+			diskStat, err := disk.Usage(mount)
+			if err != nil {
+				log.Printf("获取磁盘挂载点 '%s' 的使用统计失败: %v", mount, err)
+				return
 			}
+
+			// 安全更新共享的map
+			diskMutex.Lock()
+			stats.Disk[mount] = DiskStats{
+				Total:       diskStat.Total,
+				Used:        diskStat.Used,
+				Free:        diskStat.Free,
+				UsedPercent: diskStat.UsedPercent,
+				FSType:      diskStat.Fstype,
+			}
+			diskMutex.Unlock()
 		}(mountPoint)
 	}
 
 	// 等待所有磁盘收集完成
 	diskWg.Wait()
+
+	// 检查是否成功收集到任何磁盘数据
+	if len(stats.Disk) == 0 {
+		log.Printf("警告: 没有成功收集到任何磁盘使用数据")
+	}
 }
 
 // 收集网络信息
@@ -185,53 +202,45 @@ func (pc *ParallelCollector) collectNetworkInfo(stats *SystemStats, now time.Tim
 	go func() {
 		defer netWg.Done()
 
-		if netIOCounters, err := psnet.IOCounters(true); err == nil {
-			var totalSent, totalRecv uint64
-			var prevNetIOCounters map[string]psnet.IOCountersStat
+		netIOCounters, err := psnet.IOCounters(true)
+		if err != nil {
+			log.Printf("获取网络接口计数器失败: %v", err)
+			return
+		}
 
-			// 获取上次采集的网络数据，计算速率
-			if pc.lastNetworkStats != nil {
-				prevNetIOCounters = pc.lastNetworkStats
-				timeDiff := now.Sub(pc.lastCollectTime).Seconds()
+		if len(netIOCounters) == 0 {
+			log.Printf("警告: 系统未返回任何网络接口计数器数据")
+			return
+		}
 
-				if timeDiff > 0 {
-					for _, netIO := range netIOCounters {
-						if len(pc.interfaces) == 0 || containsString(pc.interfaces, netIO.Name) {
-							prev, exists := prevNetIOCounters[netIO.Name]
+		var totalSent, totalRecv uint64
+		var prevNetIOCounters map[string]psnet.IOCountersStat
 
-							// 计算网络速率
-							uploadSpeed := uint64(0)
-							downloadSpeed := uint64(0)
+		// 获取上次采集的网络数据，计算速率
+		if pc.lastNetworkStats != nil {
+			prevNetIOCounters = pc.lastNetworkStats
+			timeDiff := now.Sub(pc.lastCollectTime).Seconds()
 
-							if exists && timeDiff > 0 {
-								uploadSpeed = uint64(float64(netIO.BytesSent-prev.BytesSent) / timeDiff)
-								downloadSpeed = uint64(float64(netIO.BytesRecv-prev.BytesRecv) / timeDiff)
-							}
-
-							netMutex.Lock()
-							stats.Network.Interfaces[netIO.Name] = InterfaceStats{
-								BytesSent:     netIO.BytesSent,
-								BytesRecv:     netIO.BytesRecv,
-								UploadSpeed:   uploadSpeed,
-								DownloadSpeed: downloadSpeed,
-							}
-							netMutex.Unlock()
-
-							totalSent += netIO.BytesSent
-							totalRecv += netIO.BytesRecv
-						}
-					}
-				}
-			} else {
-				// 首次采集，无法计算速率
+			if timeDiff > 0 {
 				for _, netIO := range netIOCounters {
 					if len(pc.interfaces) == 0 || containsString(pc.interfaces, netIO.Name) {
+						prev, exists := prevNetIOCounters[netIO.Name]
+
+						// 计算网络速率
+						uploadSpeed := uint64(0)
+						downloadSpeed := uint64(0)
+
+						if exists && timeDiff > 0 {
+							uploadSpeed = uint64(float64(netIO.BytesSent-prev.BytesSent) / timeDiff)
+							downloadSpeed = uint64(float64(netIO.BytesRecv-prev.BytesRecv) / timeDiff)
+						}
+
 						netMutex.Lock()
 						stats.Network.Interfaces[netIO.Name] = InterfaceStats{
 							BytesSent:     netIO.BytesSent,
 							BytesRecv:     netIO.BytesRecv,
-							UploadSpeed:   0,
-							DownloadSpeed: 0,
+							UploadSpeed:   uploadSpeed,
+							DownloadSpeed: downloadSpeed,
 						}
 						netMutex.Unlock()
 
@@ -240,19 +249,36 @@ func (pc *ParallelCollector) collectNetworkInfo(stats *SystemStats, now time.Tim
 					}
 				}
 			}
-
-			netMutex.Lock()
-			stats.Network.TotalSent = totalSent
-			stats.Network.TotalReceived = totalRecv
-
-			// 保存当前采集结果，用于下次计算速率
-			pc.lastNetworkStats = make(map[string]psnet.IOCountersStat)
+		} else {
+			// 首次采集，无法计算速率
 			for _, netIO := range netIOCounters {
-				pc.lastNetworkStats[netIO.Name] = netIO
+				if len(pc.interfaces) == 0 || containsString(pc.interfaces, netIO.Name) {
+					netMutex.Lock()
+					stats.Network.Interfaces[netIO.Name] = InterfaceStats{
+						BytesSent:     netIO.BytesSent,
+						BytesRecv:     netIO.BytesRecv,
+						UploadSpeed:   0,
+						DownloadSpeed: 0,
+					}
+					netMutex.Unlock()
+
+					totalSent += netIO.BytesSent
+					totalRecv += netIO.BytesRecv
+				}
 			}
-			pc.lastCollectTime = now
-			netMutex.Unlock()
 		}
+
+		netMutex.Lock()
+		stats.Network.TotalSent = totalSent
+		stats.Network.TotalReceived = totalRecv
+
+		// 保存当前采集结果，用于下次计算速率
+		pc.lastNetworkStats = make(map[string]psnet.IOCountersStat)
+		for _, netIO := range netIOCounters {
+			pc.lastNetworkStats[netIO.Name] = netIO
+		}
+		pc.lastCollectTime = now
+		netMutex.Unlock()
 	}()
 
 	// 2. 收集IP地址信息
