@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -36,8 +37,19 @@ func main() {
 	var metricsReporter reporter.Reporter
 	if !*debug {
 		// 初始化数据上报模块
-		serverURL := "http://" + *serverAddr
-		metricsReporter = reporter.NewHTTPReporter(serverURL)
+		var serverURL string
+		// 检查serverAddr是否已包含协议前缀
+		if strings.HasPrefix(*serverAddr, "http://") || strings.HasPrefix(*serverAddr, "https://") {
+			serverURL = *serverAddr
+		} else {
+			serverURL = "http://" + *serverAddr
+		}
+		// 获取主机名作为节点ID
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown-node"
+		}
+		metricsReporter = reporter.NewHTTPReporter(serverURL, hostname)
 		log.Printf("数据上报模块初始化完成，目标服务器: %s\n", serverURL)
 	} else {
 		log.Println("调试模式启用，将只打印收集的数据而不上报")

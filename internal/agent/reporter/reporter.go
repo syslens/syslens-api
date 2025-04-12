@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -16,15 +17,17 @@ type Reporter interface {
 // HTTPReporter 实现了通过HTTP上报数据的Reporter
 type HTTPReporter struct {
 	serverURL     string        // 主控服务器URL
+	nodeID        string        // 新增节点ID字段
 	client        *http.Client  // HTTP客户端
 	retryCount    int           // 重试次数
 	retryInterval time.Duration // 重试间隔
 }
 
 // NewHTTPReporter 创建一个新的HTTP上报器
-func NewHTTPReporter(serverURL string, options ...func(*HTTPReporter)) *HTTPReporter {
+func NewHTTPReporter(serverURL string, nodeID string, options ...func(*HTTPReporter)) *HTTPReporter {
 	r := &HTTPReporter{
 		serverURL:     serverURL,
+		nodeID:        nodeID, // 新增节点ID字段
 		retryCount:    3,
 		retryInterval: 5 * time.Second,
 		client: &http.Client{
@@ -90,6 +93,17 @@ func (r *HTTPReporter) Report(data interface{}) error {
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("User-Agent", "SysLens-Agent")
+
+		// 添加节点ID头部
+		nodeID := r.nodeID
+		if nodeID == "" {
+			if hostname, err := os.Hostname(); err == nil {
+				nodeID = hostname
+			} else {
+				nodeID = "unknown-node"
+			}
+		}
+		req.Header.Set("X-Node-ID", nodeID)
 
 		resp, err := r.client.Do(req)
 		if err != nil {

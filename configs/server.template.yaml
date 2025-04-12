@@ -24,12 +24,14 @@ storage:
     data_dir: "data/metrics"
     # 文件滚动周期(小时)
     rotate_hours: 24
-  # InfluxDB配置(如果使用)
+  # InfluxDB配置
   influxdb:
     url: "http://localhost:8086"
     token: "your-influxdb-token"
     org: "syslens"
     bucket: "metrics"
+    # 数据保留策略（单位天）
+    retention_days: 30
 
 # 节点管理配置
 discovery:
@@ -44,6 +46,20 @@ alerting:
   enabled: true
   # 告警检查间隔(秒)
   check_interval: 60
+  # 告警规则
+  rules:
+  - name: "high-cpu-usage"
+    condition: "cpu.usage > 90"
+    duration: "5m"
+    severity: "warning"
+  - name: "high-memory-usage"
+    condition: "memory.used_percent > 90"
+    duration: "5m"
+    severity: "warning"
+  - name: "high-disk-usage"
+    condition: "disk./.used_percent > 90"
+    duration: "5m"
+    severity: "warning"
   # 通知配置
   notifiers:
     # 邮件通知
