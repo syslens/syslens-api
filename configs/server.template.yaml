@@ -10,10 +10,27 @@ server:
   cert_file: "certs/server.crt"
   key_file: "certs/server.key"
 
+# 数据安全配置
+security:
+  # 数据传输加密
+  encryption:
+    # 是否启用加密
+    enabled: true
+    # 加密算法(目前支持aes-256-gcm)
+    algorithm: "aes-256-gcm"
+    # 加密密钥(32字节，较短会自动填充，较长会截断)
+    key: "${ENCRYPTION_KEY:-your-encryption-key-change-in-production}"
+  # 数据压缩
+  compression:
+    # 是否启用压缩
+    enabled: true
+    # 压缩算法(目前支持gzip)
+    algorithm: "gzip"
+
 # 存储配置
 storage:
   # 存储类型: memory, file, influxdb
-  type: "memory"
+  type: "${STORAGE_TYPE:-influxdb}"
   # 内存存储配置
   memory:
     # 每个节点的最大存储条目数
@@ -26,10 +43,10 @@ storage:
     rotate_hours: 24
   # InfluxDB配置
   influxdb:
-    url: "http://localhost:8086"
-    token: "your-influxdb-token"
-    org: "syslens"
-    bucket: "metrics"
+    url: "${INFLUXDB_URL:-http://localhost:8086}"
+    token: "${INFLUXDB_TOKEN:-your-influxdb-token}"
+    org: "${INFLUXDB_ORG:-syslens}"
+    bucket: "${INFLUXDB_BUCKET:-metrics}"
     # 数据保留策略（单位天）
     retention_days: 30
 
