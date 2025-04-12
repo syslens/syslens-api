@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -17,6 +21,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// 全局错误日志记录器
+var errorLogger *log.Logger
+
 func main() {
 	// 解析命令行参数
 	configPath := flag.String("config", "configs/agent.yaml", "配置文件路径")
@@ -24,6 +31,22 @@ func main() {
 	interval := flag.Int("interval", 500, "数据采集间隔(毫秒)")
 	debug := flag.Bool("debug", false, "调试模式(只打印不上报)")
 	flag.Parse()
+
+	// 创建日志目录
+	os.MkdirAll("logs", 0755)
+
+	// 初始化错误日志文件
+	errorLogFile := "logs/agent_errors.log"
+	errFile, err := os.OpenFile(errorLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("警告: 无法创建错误日志文件: %v，错误将只输出到标准输出", err)
+		errorLogger = log.New(os.Stderr, "[ERROR] ", log.LstdFlags)
+	} else {
+		// 同时输出到文件和控制台
+		multiWriter := io.MultiWriter(os.Stderr, errFile)
+		errorLogger = log.New(multiWriter, "[ERROR] ", log.LstdFlags)
+		log.Printf("错误日志将同时记录到: %s", errorLogFile)
+	}
 
 	// 日志初始化
 	log.Println("SysLens节点代理启动中...")
@@ -34,7 +57,7 @@ func main() {
 	// 加载配置文件
 	agentConfig, err := loadConfig(*configPath)
 	if err != nil {
-		log.Printf("警告: 无法加载配置文件，使用默认配置: %v\n", err)
+		errorLogger.Printf("无法加载配置文件，使用默认配置: %v\n", err)
 		// 创建默认配置
 		agentConfig = &config.AgentConfig{
 			Security: config.SecurityConfig{
@@ -143,6 +166,11 @@ func main() {
 	log.Println("节点代理正在关闭...")
 	ticker.Stop()
 	log.Println("节点代理已安全退出")
+
+	// 关闭错误日志文件
+	if errFile != nil {
+		errFile.Close()
+	}
 }
 
 // loadConfig 从文件加载配置并支持环境变量替换
@@ -187,13 +215,14 @@ func loadConfig(path string) (*config.AgentConfig, error) {
 
 // collectAndReport 收集并上报系统指标
 func collectAndReport(collector collector.Collector, reporter reporter.Reporter, debugMode bool) {
+	collectTime := time.Now().Format("2006-01-02 15:04:05")
 	log.Println("开始采集系统指标...")
 
 	// 收集指标
 	startTime := time.Now()
 	stats, err := collector.Collect()
 	if err != nil {
-		log.Printf("采集指标失败: %v\n", err)
+		errorLogger.Printf("采集指标失败: %v\n", err)
 		return
 	}
 
@@ -218,9 +247,56 @@ func collectAndReport(collector collector.Collector, reporter reporter.Reporter,
 		log.Println("开始上报系统指标...")
 		err = reporter.Report(stats)
 		if err != nil {
-			log.Printf("上报指标失败: %v\n", err)
+			// 详细记录上报失败信息
+			errMsg := fmt.Sprintf("上报失败 [时间点: %s] - 错误: %v", collectTime, err)
+			errorLogger.Printf("%s\n", errMsg)
+
+			// 提取更具体的错误信息
+			if strings.Contains(err.Error(), "connection refused") {
+				errorLogger.Println("原因: 主控服务器可能未启动或无法访问")
+			} else if strings.Contains(err.Error(), "timeout") {
+				errorLogger.Println("原因: 连接主控服务器超时")
+			} else if strings.Contains(err.Error(), "no such host") {
+				errorLogger.Println("原因: 无法解析主控服务器主机名")
+			}
+
+			// 在标准日志中也输出简要信息
+			log.Printf("上报失败: %v - 详细错误已记录到错误日志", err)
+			log.Println("将继续采集数据，即使上报失败")
+
+			// 保存失败数据到本地缓存文件
+			saveFailedReportData(stats, collectTime)
 		} else {
-			log.Println("系统指标上报成功")
+			log.Printf("系统指标上报成功 [时间点: %s]\n", collectTime)
 		}
 	}
+}
+
+// saveFailedReportData 将上报失败的数据保存到本地文件
+func saveFailedReportData(stats *collector.SystemStats, timestamp string) {
+	// 创建缓存目录
+	cacheDir := "tmp/failed_reports"
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		errorLogger.Printf("创建缓存目录失败: %v", err)
+		return
+	}
+
+	// 生成文件名，使用时间戳确保唯一性
+	safeTime := strings.ReplaceAll(timestamp, ":", "-")
+	filename := filepath.Join(cacheDir, fmt.Sprintf("metrics_%s.json", safeTime))
+
+	// 序列化数据
+	data, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		errorLogger.Printf("序列化失败数据失败: %v", err)
+		return
+	}
+
+	// 写入文件
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		errorLogger.Printf("保存失败数据到文件失败: %v", err)
+		return
+	}
+
+	errorLogger.Printf("已保存上报失败的数据到: %s", filename)
 }

@@ -2,8 +2,11 @@ package reporter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -124,12 +127,15 @@ func (r *HTTPReporter) Report(data interface{}) error {
 	for i := 0; i <= r.retryCount; i++ {
 		if i > 0 {
 			// 重试前等待
-			time.Sleep(r.retryInterval)
+			retryDelay := r.retryInterval
+			log.Printf("上报重试 (%d/%d)，等待 %v 后重试...", i, r.retryCount, retryDelay)
+			time.Sleep(retryDelay)
 		}
 
 		req, err := http.NewRequest("POST", r.serverURL+"/api/v1/metrics", bytes.NewBuffer(processedData))
 		if err != nil {
-			lastErr = err
+			lastErr = fmt.Errorf("创建HTTP请求失败: %w", err)
+			log.Printf("重试失败: %v", lastErr)
 			continue
 		}
 
@@ -156,22 +162,40 @@ func (r *HTTPReporter) Report(data interface{}) error {
 			req.Header.Set("X-Encrypted", "true")
 		}
 
+		// 添加请求上下文，带超时控制
+		ctx, cancel := context.WithTimeout(context.Background(), r.client.Timeout)
+		req = req.WithContext(ctx)
+
+		startTime := time.Now()
 		resp, err := r.client.Do(req)
+		requestTime := time.Since(startTime)
+		cancel() // 释放上下文资源
+
 		if err != nil {
-			lastErr = fmt.Errorf("HTTP请求失败: %w", err)
+			lastErr = fmt.Errorf("HTTP请求失败 (耗时: %v): %w", requestTime, err)
+			log.Printf("请求错误: %v", lastErr)
 			continue
 		}
 
 		defer resp.Body.Close()
 
+		// 读取响应内容，用于详细日志
+		respBody, _ := io.ReadAll(resp.Body)
+
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			log.Printf("上报成功，响应码: %d，耗时: %v", resp.StatusCode, requestTime)
 			return nil // 成功
 		}
 
-		lastErr = fmt.Errorf("服务器返回错误状态码: %d", resp.StatusCode)
+		lastErr = fmt.Errorf("服务器返回错误状态码: %d，响应: %s", resp.StatusCode, string(respBody))
+		log.Printf("服务端错误: %v", lastErr)
 	}
 
-	return fmt.Errorf("数据上报失败，已重试%d次: %w", r.retryCount, lastErr)
+	// 构造详细的错误信息
+	detailedErr := fmt.Errorf("数据上报失败，已重试%d次，主控节点URL: %s，最后错误: %w",
+		r.retryCount, r.serverURL, lastErr)
+
+	return detailedErr
 }
 
 // processData 处理数据：压缩和加密
