@@ -26,8 +26,8 @@ server:
 
 # 采集配置
 collection:
-  # 采集间隔(秒)
-  interval: 30
+  # 采集间隔(毫秒)
+  interval: 30000
   # 开启的采集项
   enabled:
     cpu: true
@@ -38,7 +38,7 @@ collection:
   # 磁盘采集配置
   disk:
     # 要监控的挂载点([]表示所有)
-    mount_points: ["/"]
+    mount_points: [ "/" ]
     # 是否包含不活跃的磁盘
     include_inactive: false
   # 网络采集配置
@@ -50,7 +50,7 @@ collection:
     # 是否收集所有进程信息
     collect_all: false
     # 要监控的特定进程名称
-    target_processes: ["nginx", "mysql", "redis-server"]
+    target_processes: [ "nginx", "mysql", "redis-server" ]
     # 最大监控进程数
     max_processes: 20
 

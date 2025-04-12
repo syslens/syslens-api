@@ -17,7 +17,7 @@ func main() {
 	// 解析命令行参数
 	configPath := flag.String("config", "configs/agent.yaml", "配置文件路径")
 	serverAddr := flag.String("server", "localhost:8080", "主控服务器地址")
-	interval := flag.Int("interval", 30, "数据采集间隔(秒)")
+	interval := flag.Int("interval", 30000, "数据采集间隔(毫秒)")
 	debug := flag.Bool("debug", false, "调试模式(只打印不上报)")
 	flag.Parse()
 
@@ -25,7 +25,7 @@ func main() {
 	log.Println("SysLens节点代理启动中...")
 	log.Printf("配置文件路径: %s\n", *configPath)
 	log.Printf("连接到服务器: %s\n", *serverAddr)
-	log.Printf("采集间隔: %d秒\n", *interval)
+	log.Printf("采集间隔: %d毫秒\n", *interval)
 
 	// TODO: 加载配置文件
 
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// 启动定时采集任务
-	ticker := time.NewTicker(time.Duration(*interval) * time.Second)
+	ticker := time.NewTicker(time.Duration(*interval) * time.Millisecond)
 	go func() {
 		// 立即执行一次采集
 		collectAndReport(systemCollector, metricsReporter, *debug)

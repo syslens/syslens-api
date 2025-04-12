@@ -5,7 +5,7 @@
 # 设置默认参数
 SERVER_URL=${SERVER_URL:-"localhost:8080"}  # 移除默认的http://前缀
 CONFIG_PATH=${CONFIG_PATH:-"configs/agent.yaml"}
-INTERVAL=${INTERVAL:-30}
+INTERVAL=${INTERVAL:-30000}  # 默认30000毫秒 (30秒)
 DEBUG=${DEBUG:-false}
 
 # 添加URL规范化处理
@@ -21,7 +21,7 @@ mkdir -p logs
 echo "启动SysLens节点代理..."
 echo "配置文件路径: $CONFIG_PATH"
 echo "连接到服务器: $SERVER_URL"
-echo "采集间隔: ${INTERVAL}秒"
+echo "采集间隔: ${INTERVAL}毫秒"
 if [ "$DEBUG" = "true" ]; then
     echo "调试模式: 启用"
 else
