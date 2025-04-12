@@ -81,8 +81,9 @@ func main() {
 	}
 
 	// 初始化指标收集器
-	systemCollector := collector.NewSystemCollector()
-	log.Println("系统指标收集器初始化完成")
+	// systemCollector := collector.NewSystemCollector()
+	systemCollector := collector.NewParallelCollector()
+	log.Println("系统指标收集器初始化完成(并行收集模式)")
 
 	// 如果不是调试模式，则初始化上报模块
 	var metricsReporter reporter.Reporter
