@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/syslens/syslens-api/internal/common/utils"
+	"github.com/syslens/syslens-api/internal/config"
 )
 
 // Reporter 定义了指标上报器接口
@@ -17,27 +20,47 @@ type Reporter interface {
 // HTTPReporter 实现了通过HTTP上报数据的Reporter
 type HTTPReporter struct {
 	serverURL     string        // 主控服务器URL
-	nodeID        string        // 新增节点ID字段
+	nodeID        string        // 节点ID字段
 	client        *http.Client  // HTTP客户端
 	retryCount    int           // 重试次数
 	retryInterval time.Duration // 重试间隔
+
+	securityConfig *config.SecurityConfig   // 安全配置
+	encryptionSvc  *utils.EncryptionService // 加密服务
 }
 
 // NewHTTPReporter 创建一个新的HTTP上报器
 func NewHTTPReporter(serverURL string, nodeID string, options ...func(*HTTPReporter)) *HTTPReporter {
 	r := &HTTPReporter{
 		serverURL:     serverURL,
-		nodeID:        nodeID, // 新增节点ID字段
+		nodeID:        nodeID,
 		retryCount:    3,
 		retryInterval: 5 * time.Second,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
+		},
+		securityConfig: &config.SecurityConfig{
+			Encryption: config.EncryptionConfig{
+				Enabled:   false,
+				Algorithm: "aes-256-gcm",
+				Key:       "",
+			},
+			Compression: config.CompressionConfig{
+				Enabled:   false,
+				Algorithm: "gzip",
+				Level:     6,
+			},
 		},
 	}
 
 	// 应用选项
 	for _, option := range options {
 		option(r)
+	}
+
+	// 初始化加密服务
+	if r.securityConfig.Encryption.Enabled {
+		r.encryptionSvc = utils.NewEncryptionService(r.securityConfig.Encryption.Algorithm)
 	}
 
 	return r
@@ -70,11 +93,30 @@ func WithTimeout(timeout time.Duration) func(*HTTPReporter) {
 	}
 }
 
+// WithSecurityConfig 设置安全配置
+func WithSecurityConfig(secConfig *config.SecurityConfig) func(*HTTPReporter) {
+	return func(r *HTTPReporter) {
+		if secConfig != nil {
+			r.securityConfig = secConfig
+			// 初始化加密服务
+			if r.securityConfig.Encryption.Enabled {
+				r.encryptionSvc = utils.NewEncryptionService(r.securityConfig.Encryption.Algorithm)
+			}
+		}
+	}
+}
+
 // Report 将数据上报到服务器
 func (r *HTTPReporter) Report(data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("数据序列化失败: %w", err)
+	}
+
+	// 压缩和加密数据
+	processedData, contentType, err := r.processData(jsonData)
+	if err != nil {
+		return fmt.Errorf("数据处理失败: %w", err)
 	}
 
 	// 发送数据，支持重试
@@ -85,13 +127,14 @@ func (r *HTTPReporter) Report(data interface{}) error {
 			time.Sleep(r.retryInterval)
 		}
 
-		req, err := http.NewRequest("POST", r.serverURL+"/api/v1/metrics", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequest("POST", r.serverURL+"/api/v1/metrics", bytes.NewBuffer(processedData))
 		if err != nil {
 			lastErr = err
 			continue
 		}
 
-		req.Header.Set("Content-Type", "application/json")
+		// 设置适当的内容类型
+		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("User-Agent", "SysLens-Agent")
 
 		// 添加节点ID头部
@@ -104,6 +147,14 @@ func (r *HTTPReporter) Report(data interface{}) error {
 			}
 		}
 		req.Header.Set("X-Node-ID", nodeID)
+
+		// 添加数据处理标记
+		if r.securityConfig.Compression.Enabled {
+			req.Header.Set("X-Compressed", "gzip")
+		}
+		if r.securityConfig.Encryption.Enabled {
+			req.Header.Set("X-Encrypted", "true")
+		}
 
 		resp, err := r.client.Do(req)
 		if err != nil {
@@ -121,4 +172,31 @@ func (r *HTTPReporter) Report(data interface{}) error {
 	}
 
 	return fmt.Errorf("数据上报失败，已重试%d次: %w", r.retryCount, lastErr)
+}
+
+// processData 处理数据：压缩和加密
+func (r *HTTPReporter) processData(data []byte) ([]byte, string, error) {
+	processedData := data
+	contentType := "application/json"
+	var err error
+
+	// 步骤1：压缩
+	if r.securityConfig.Compression.Enabled {
+		processedData, err = utils.CompressData(processedData, r.securityConfig.Compression.Level)
+		if err != nil {
+			return nil, contentType, fmt.Errorf("压缩失败: %w", err)
+		}
+		contentType = "application/octet-stream"
+	}
+
+	// 步骤2：加密
+	if r.securityConfig.Encryption.Enabled && r.encryptionSvc != nil {
+		processedData, err = r.encryptionSvc.Encrypt(processedData, r.securityConfig.Encryption.Key)
+		if err != nil {
+			return nil, contentType, fmt.Errorf("加密失败: %w", err)
+		}
+		contentType = "application/octet-stream"
+	}
+
+	return processedData, contentType, nil
 }
