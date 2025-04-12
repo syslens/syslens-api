@@ -30,7 +30,16 @@ func main() {
 	// 输出到控制台
 	fmt.Println(string(data))
 
-	// 也保存到文件方便检查
-	os.WriteFile("system_stats.json", data, 0644)
-	fmt.Println("系统指标已保存到 system_stats.json")
+	// 创建tmp目录（如果不存在）
+	if err := os.MkdirAll("tmp", 0755); err != nil {
+		log.Printf("创建tmp目录失败: %v", err)
+	}
+
+	// 保存到tmp目录方便检查
+	outPath := "tmp/system_stats.json"
+	if err := os.WriteFile(outPath, data, 0644); err != nil {
+		log.Printf("保存文件失败: %v", err)
+	} else {
+		fmt.Printf("系统指标已保存到 %s\n", outPath)
+	}
 }

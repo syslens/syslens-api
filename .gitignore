@@ -311,3 +311,6 @@ dist/
 # 忽略真实配置文件，但保留模板
 /configs/*.yaml
 !/configs/*.template.yaml
+
+# 忽略tmp目录
+tmp/
