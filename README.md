@@ -30,8 +30,9 @@ syslens-api/
 │   │   └── main.go
 │   ├── agent/              # 节点端入口
 │   │   └── main.go
-│   └── collectors/         # 辅助工具
-│       └── collect_stats.go # 系统指标收集测试工具
+│   ├── collectors/         # 辅助工具
+│   │   └── collect_stats.go # 系统指标收集测试工具
+│   └── test/               # 测试命令工具目录(预留)
 ├── internal/               # 内部私有代码
 │   ├── agent/              # 节点端核心逻辑
 │   │   ├── collector/      # 系统指标收集
@@ -65,7 +66,8 @@ syslens-api/
 ├── docs/                   # 项目文档
 │   ├── architecture.md     # 架构设计文档
 │   └── api.md              # API使用文档
-├── test/                   # 测试资源与工具
+├── test/                   # 集成测试与测试工具(预留)
+├── tmp/                    # 临时文件目录(不纳入版本控制)
 ├── go.mod                  # Go模块定义
 ├── go.sum                  # 依赖版本锁定
 └── README.md               # 项目说明文档
@@ -372,3 +374,58 @@ alerting:
 ```
 
 重启主控端服务使配置生效。
+
+### 测试结构
+
+SysLens采用多层次的测试策略，确保系统的可靠性和稳定性：
+
+#### 测试目录结构
+
+- **单元测试**: 直接位于各包内的`*_test.go`文件
+
+  ```bash
+  # 例如，针对collector包的测试
+  internal/agent/collector/system_test.go
+  ```
+
+- **`test/`目录**: 用于集成测试和系统测试
+
+  ```bash
+  test/integration/      # 集成测试
+  test/benchmark/        # 性能基准测试
+  test/fixtures/         # 测试数据和固定资源
+  ```
+  
+- **`cmd/test/`目录**: 预留用于测试工具的可执行命令
+
+  ```bash
+  cmd/test/load_test.go  # 负载测试工具(示例)
+  ```
+  
+- **`cmd/collectors/`目录**: 实用数据收集工具
+
+  ```bash
+  cmd/collectors/collect_stats.go  # 系统指标收集工具
+  ```
+
+#### 如何运行测试
+
+```bash
+# 运行所有单元测试
+make test
+
+# 运行特定包的测试
+go test -v ./internal/agent/collector
+
+# 运行指标收集工具
+go run cmd/collectors/collect_stats.go
+```
+
+#### 测试数据存放
+
+测试产生的临时数据存放在`tmp/`目录下，此目录已通过`.gitignore`配置为不纳入版本控制。手动生成的测试数据也应放在此目录：
+
+```bash
+tmp/system_stats.json   # 系统指标收集测试结果
+tmp/test_results/       # 其他测试生成的数据
+```
