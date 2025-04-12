@@ -216,6 +216,37 @@ collection:
   interval: 500
 ```
 
+### 构建与运行工具
+
+SysLens提供了两种运行和构建方式，分别适用于不同场景：
+
+#### Makefile vs 启动脚本
+
+| 工具类型 | 特点 | 适用场景 |
+|---------|------|---------|
+| **Makefile** | 简洁命令、直接调用、无额外检查 | 开发环境、快速测试 |
+| **脚本(scripts/)** | 错误处理、环境变量配置、健康检查 | 生产环境、自动化部署 |
+
+两者并不冲突，而是针对不同需求设计的互补工具：
+
+- **Makefile命令**：
+
+  ```bash
+  make build-all    # 构建所有组件
+  make run-server   # 运行主控端(无初始化和检查)
+  make run-agent    # 运行节点端(无连接测试)
+  ```
+
+- **启动脚本**：
+
+  ```bash
+  ./scripts/start-server-with-influxdb.sh  # 包含InfluxDB初始化
+  ./scripts/start-agent.sh                 # 包含连接测试和URL规范化
+  ./scripts/build.sh --all                 # 高级构建选项
+  ```
+
+**建议**：开发测试时使用Makefile，生产部署时使用脚本。
+
 ### 运行服务
 
 #### 使用启动脚本（推荐）
