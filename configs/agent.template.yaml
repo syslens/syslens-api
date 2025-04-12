@@ -22,7 +22,7 @@ server:
   # 重试次数
   retry_count: 3
   # 重试间隔(秒)
-  retry_interval: 5
+  retry_interval: ${RETRY_INTERVAL:-1}
 
 # 数据安全配置
 security:

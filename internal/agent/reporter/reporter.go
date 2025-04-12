@@ -38,7 +38,7 @@ func NewHTTPReporter(serverURL string, nodeID string, options ...func(*HTTPRepor
 		serverURL:     serverURL,
 		nodeID:        nodeID,
 		retryCount:    3,
-		retryInterval: 5 * time.Second,
+		retryInterval: 1 * time.Second,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
