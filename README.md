@@ -2,6 +2,16 @@
 
 SysLens是一个分布式服务器监控系统，由主控端和节点端组成，可实时监控和分析多服务器环境的系统指标。
 
+## 功能特点
+
+- **毫秒级监控**：支持500毫秒以上的高频数据采集
+- **自动资源初始化**：自动创建所需的InfluxDB组织和存储桶
+- **分布式架构**：主控/节点分离，可监控大规模服务器集群
+- **多指标采集**：CPU、内存、磁盘、网络、进程等全方位监控
+- **连接健康检查**：启动前自动检测主控连接状态
+- **可扩展存储**：支持内存存储和InfluxDB时序数据库
+- **告警通知**：可配置的告警规则和通知渠道
+
 ## 系统架构
 
 系统由两个主要组件构成：
@@ -18,8 +28,10 @@ syslens-api/
 ├── cmd/                    # 可执行文件入口
 │   ├── server/             # 主控端入口
 │   │   └── main.go
-│   └── agent/              # 节点端入口
-│       └── main.go
+│   ├── agent/              # 节点端入口
+│   │   └── main.go
+│   └── collectors/         # 辅助工具
+│       └── collect_stats.go # 系统指标收集测试工具
 ├── internal/               # 内部私有代码
 │   ├── agent/              # 节点端核心逻辑
 │   │   ├── collector/      # 系统指标收集
@@ -81,14 +93,17 @@ syslens-api/
 - **CPU**: 使用率、负载、核心数等
 - **内存**: 总量、使用量、使用率、交换分区状态
 - **磁盘**: 使用率、I/O状态、读写速度
-- **网络**: 流量、连接数、带宽使用情况
+- **网络**: 流量、连接数、带宽使用情况，公网/内网IP地址
 - **进程**: 重要进程资源占用情况
+- **系统信息**: 主机名、平台、运行时间等
 
 ## 技术栈
 
-- **后端**: Go语言
-- **通信**: gRPC/HTTP
-- **数据存储**: 根据需求可选择时序数据库
+- **后端**: Go语言 (1.18+)
+- **通信**: HTTP REST API
+- **数据存储**: InfluxDB 2.x 时序数据库
+- **配置格式**: YAML
+- **监控组件**: gopsutil、shirou/gopsutil
 - **前端**: (可选)基于Web的仪表盘界面
 
 ## 使用教程
@@ -161,22 +176,21 @@ cp configs/agent.template.yaml configs/agent.yaml
 配置文件位于`configs/server.yaml`，主要配置项包括：
 
 - **监听地址**: 默认为`0.0.0.0:8080`
-- **存储设置**: 可选内存、文件或时序数据库
+- **存储设置**: 可选内存、文件或InfluxDB时序数据库
 - **告警规则**: 可配置各类资源的告警阈值
 - **通知方式**: 支持邮件、Webhook等
 
-示例配置修改：
+InfluxDB相关配置：
 
-```bash
-# 修改监听端口
-server:
-  http_addr: "0.0.0.0:9090"
-
-# 启用文件存储
+```yaml
 storage:
-  type: "file"
-  file:
-    data_dir: "/path/to/data"
+  type: "influxdb"
+  influxdb:
+    url: "http://localhost:8086"
+    token: "your-influxdb-token"
+    org: "syslens"
+    bucket: "metrics"
+    retention_days: 30
 ```
 
 #### 节点端配置
@@ -185,48 +199,52 @@ storage:
 
 - **服务器地址**: 主控端的连接地址
 - **节点标识**: 节点的唯一标识和标签
-- **采集间隔**: 数据采集的时间间隔
+- **采集间隔**: 数据采集的时间间隔（毫秒）
 - **采集项目**: 可启用或禁用特定资源的监控
 
 示例配置修改：
 
-```bash
+```yaml
 # 设置节点标签
 node:
   labels:
     environment: "production"
     role: "database"
 
-# 修改采集间隔为10秒
+# 修改采集间隔为500毫秒
 collection:
-  interval: 10
+  interval: 500
 ```
 
 ### 运行服务
 
-#### 直接运行
+#### 使用启动脚本（推荐）
 
+1. 运行主控端（需要设置InfluxDB令牌）：
+
+```bash
+export INFLUXDB_TOKEN=your-token-here
+./scripts/start-server-with-influxdb.sh
+```
+
+2. 运行节点端（可指定主控端地址和采集间隔）：
+
+```bash
+SERVER_URL=http://192.168.1.100:8080 INTERVAL=1000 ./scripts/start-agent.sh
+```
+
+#### 直接运行
 
 1. 运行主控端：
 
 ```bash
-./bin/server -config configs/server.yaml
+./bin/server -config configs/server.yaml -storage influxdb -influx-token your-token-here
 ```
 
 2. 运行节点端（在每台需要监控的服务器上）：
 
 ```bash
-./bin/agent -config configs/agent.yaml -server http://主控端IP:8080
-```
-
-#### 使用Makefile运行（开发环境）
-
-```bash
-# 运行主控端
-make run-server
-
-# 运行节点端
-make run-agent
+./bin/agent -config configs/agent.yaml -server http://主控端IP:8080 -interval 500
 ```
 
 ### 访问监控数据
@@ -254,22 +272,45 @@ curl -X GET http://主控端IP:8080/api/v1/nodes/metrics?node_id=web-server-01
 curl -X GET "http://主控端IP:8080/api/v1/nodes/metrics?node_id=web-server-01&start=2023-06-01T10:00:00Z&end=2023-06-01T11:00:00Z"
 ```
 
+### 实用工具
+
+SysLens提供了一些实用工具来帮助您进行开发、测试和故障排查：
+
+#### 系统指标收集测试
+
+可以使用独立工具收集并查看系统指标，方便测试：
+
+```bash
+go run cmd/collectors/collect_stats.go
+```
+
+此工具会收集当前系统的所有指标并输出为JSON格式，同时保存到`tmp/system_stats.json`文件中。
+
 ### 故障排除
 
 1. **节点无法连接主控端**
+   - 启动脚本会自动进行连接测试，显示警告信息
    - 检查网络连接和防火墙设置
-   - 确认主控端地址配置正确
+   - 确认主控端地址配置正确，注意URL格式
    - 查看节点日志: `cat logs/agent.log`
 
 2. **数据采集异常**
    - 检查节点机器的权限设置
+   - 使用收集测试工具验证: `go run cmd/collectors/collect_stats.go`
    - 查看详细日志：修改`configs/agent.yaml`中的日志级别为`debug`
    - 重启节点代理：`kill -SIGTERM <进程ID>` 然后重新启动
 
 3. **主控端未接收数据**
    - 检查API服务是否正常运行：`curl http://主控端IP:8080/health`
+   - 检查节点ID是否正确发送（X-Node-ID头部）
    - 查看服务日志：`cat logs/server.log`
-   - 确认存储系统正常工作
+   - 检查InfluxDB连接：`curl -I http://localhost:8086/ping`
+
+4. **InfluxDB数据问题**
+   - 主控端会自动初始化InfluxDB资源
+   - 确认令牌权限正确: 需要读写权限
+   - 在InfluxDB UI中正确调整时间范围查询数据
+   - 检查错误日志: `grep "InfluxDB" logs/server.log`
 
 ### 更新和升级
 
