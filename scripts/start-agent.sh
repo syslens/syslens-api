@@ -1,80 +1,82 @@
 #!/bin/bash
 
-# 启动SysLens节点代理的脚本
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
 
 # 设置默认参数
-SERVER_URL=${SERVER_URL:-"localhost:8080"}  # 移除默认的http://前缀
-CONFIG_PATH=${CONFIG_PATH:-"configs/agent.yaml"}
-INTERVAL=${INTERVAL:-500}  # 默认500毫秒
-DEBUG=${DEBUG:-false}
+NODE_ID=${NODE_ID:-""}
+NODE_ENV=${NODE_ENV:-"production"}
+NODE_ROLE=${NODE_ROLE:-"web"}
+SERVER_URL=${SERVER_URL:-"http://localhost:8080"}
+SERVER_TOKEN=${SERVER_TOKEN:-""}
+COLLECTION_INTERVAL=${COLLECTION_INTERVAL:-500}
+ENCRYPTION_KEY=${ENCRYPTION_KEY:-"syslens-default-security-key-change-me"}
+LOG_LEVEL=${LOG_LEVEL:-"info"}
+LOG_FILE=${LOG_FILE:-"logs/agent.log"}
 
-# 添加URL规范化处理
-if [[ ! "$SERVER_URL" =~ ^https?:// ]]; then
+# 导出环境变量以供配置文件使用
+export NODE_ID
+export NODE_ENV
+export NODE_ROLE
+export SERVER_URL
+export SERVER_TOKEN
+export COLLECTION_INTERVAL
+export ENCRYPTION_KEY
+export LOG_LEVEL
+export LOG_FILE
+
+# 显示配置信息
+echo -e "${GREEN}启动SysLens节点代理...${NC}"
+echo "服务器地址: $SERVER_URL"
+echo "采集间隔: ${COLLECTION_INTERVAL}ms"
+echo "环境: $NODE_ENV"
+if [ -n "$NODE_ID" ]; then
+    echo "节点ID: $NODE_ID"
+else
+    echo "节点ID: 将自动生成"
+fi
+
+# 标准化服务器URL格式
+if [[ ! "$SERVER_URL" == http* ]]; then
     SERVER_URL="http://$SERVER_URL"
-    echo "已将服务器URL标准化为: $SERVER_URL"
+    echo -e "${YELLOW}已修正服务器URL格式为: $SERVER_URL${NC}"
+    export SERVER_URL
 fi
 
-# 创建输出目录
-mkdir -p logs
+# 创建日志目录
+if [[ "$LOG_FILE" != "" ]]; then
+    LOG_DIR=$(dirname "$LOG_FILE")
+    mkdir -p "$LOG_DIR"
+    echo "日志将写入: $LOG_FILE"
+fi
 
-# 输出配置信息
-echo "启动SysLens节点代理..."
-echo "配置文件路径: $CONFIG_PATH"
-echo "连接到服务器: $SERVER_URL"
-echo "采集间隔: ${INTERVAL}毫秒"
-if [ "$DEBUG" = "true" ]; then
-    echo "调试模式: 启用"
+# 测试服务器连接
+echo -e "${GREEN}正在测试与主控服务器的连接...${NC}"
+CONNECTION_TEST=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL/health" 2>/dev/null)
+
+if [ "$CONNECTION_TEST" == "200" ]; then
+    echo -e "${GREEN}服务器连接正常，状态码: $CONNECTION_TEST${NC}"
 else
-    echo "调试模式: 禁用"
+    echo -e "${YELLOW}警告: 无法连接到服务器 $SERVER_URL (状态码: $CONNECTION_TEST)${NC}"
+    echo -e "${YELLOW}节点将尝试运行，但可能无法成功上报数据${NC}"
 fi
 
-# 检查配置文件是否存在
-if [ ! -f "$CONFIG_PATH" ]; then
-    echo "警告: 配置文件 $CONFIG_PATH 不存在，将使用默认配置"
-    
-    # 如果模板存在，则复制为配置文件
-    if [ -f "configs/agent.template.yaml" ]; then
-        cp configs/agent.template.yaml "$CONFIG_PATH"
-        echo "已从模板创建配置文件: $CONFIG_PATH"
-    fi
-fi
+# 运行节点代理
+echo -e "${GREEN}正在启动节点代理...${NC}"
 
-# 此处添加连接测试
-echo "测试主控端连接..."
-# 使用兼容macOS的方式提取URL
-BASE_URL=$(echo $SERVER_URL | sed -E 's|(https?://[^/]+).*|\1|')
-if [ -z "$BASE_URL" ]; then
-    BASE_URL=$SERVER_URL
-fi
-curl -s "${BASE_URL}/health" > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "警告: 无法连接到主控端 ${BASE_URL}"
-    echo "请确保主控端已启动并且URL正确"
-    
-    # 在调试模式下不退出，其他情况询问用户是否继续
-    if [ "$DEBUG" != "true" ]; then
-        read -p "是否仍然继续启动节点代理? (y/n) " answer
-        if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
-            echo "节点代理启动已取消。"
-            exit 1
-        fi
-    fi
+# 检测是否为开发模式
+if [ -z "$GO_ENV" ] || [ "$GO_ENV" = "development" ]; then
+    # 开发模式：使用go run
+    go run cmd/agent/main.go
 else
-    echo "主控端连接测试成功!"
-fi
-
-# 提取主机名作为节点标识
-NODE_ID=${NODE_ID:-$(hostname)}
-echo "节点标识: $NODE_ID"
-
-# 启动节点代理
-DEBUG_FLAG=""
-if [ "$DEBUG" = "true" ]; then
-    DEBUG_FLAG="--debug"
-fi
-
-go run cmd/agent/main.go \
-    --config "$CONFIG_PATH" \
-    --server "$SERVER_URL" \
-    --interval "$INTERVAL" \
-    $DEBUG_FLAG 
+    # 生产模式：使用编译的二进制文件
+    if [ -f "bin/agent" ]; then
+        ./bin/agent
+    else
+        echo -e "${YELLOW}未找到编译后的二进制文件，切换到使用go run...${NC}"
+        go run cmd/agent/main.go
+    fi
+fi 
