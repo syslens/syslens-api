@@ -1,58 +1,66 @@
 #!/bin/bash
 
-# 启动InfluxDB服务器的脚本
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+# 检查InfluxDB令牌是否已设置
+if [ -z "$INFLUXDB_TOKEN" ]; then
+    echo -e "${YELLOW}警告: 未设置INFLUXDB_TOKEN环境变量，将使用配置文件中的值${NC}"
+fi
 
 # 设置默认参数
-CONFIG_PATH=${CONFIG_PATH:-"configs/server.yaml"}
-INFLUX_URL=${INFLUX_URL:-"http://localhost:8086"}
-INFLUX_ORG=${INFLUX_ORG:-"syslens"}
-INFLUX_BUCKET=${INFLUX_BUCKET:-"metrics"}
-HTTP_ADDR=${HTTP_ADDR:-"0.0.0.0:8080"}
+INFLUXDB_URL=${INFLUXDB_URL:-"http://localhost:8086"}
+INFLUXDB_ORG=${INFLUXDB_ORG:-"syslens"}
+INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-"metrics"}
+STORAGE_TYPE=${STORAGE_TYPE:-"influxdb"}
+ENCRYPTION_KEY=${ENCRYPTION_KEY:-"syslens-default-security-key-change-me"}
 
-# 检查InfluxDB token
-if [ -z "$INFLUXDB_TOKEN" ]; then
-    echo "错误: 环境变量INFLUXDB_TOKEN未设置"
-    echo "请设置InfluxDB token: export INFLUXDB_TOKEN=your_token_here"
-    exit 1
-fi
+# 导出环境变量以供配置文件使用
+export INFLUXDB_URL
+export INFLUXDB_TOKEN
+export INFLUXDB_ORG
+export INFLUXDB_BUCKET
+export STORAGE_TYPE
+export ENCRYPTION_KEY
 
-# 检查配置文件是否存在
-if [ ! -f "$CONFIG_PATH" ]; then
-    echo "警告: 配置文件 $CONFIG_PATH 不存在，将使用默认配置"
+# 显示配置信息
+echo -e "${GREEN}启动SysLens主控服务...${NC}"
+echo "存储类型: $STORAGE_TYPE"
+if [ "$STORAGE_TYPE" = "influxdb" ]; then
+    echo "InfluxDB URL: $INFLUXDB_URL"
+    echo "InfluxDB 组织: $INFLUXDB_ORG"
+    echo "InfluxDB 存储桶: $INFLUXDB_BUCKET"
     
-    # 如果模板存在，则复制为配置文件
-    if [ -f "configs/server.template.yaml" ]; then
-        cp configs/server.template.yaml "$CONFIG_PATH"
-        echo "已从模板创建配置文件: $CONFIG_PATH"
+    # 使用***显示部分令牌，增强安全性
+    if [ -n "$INFLUXDB_TOKEN" ]; then
+        TOKEN_LENGTH=${#INFLUXDB_TOKEN}
+        VISIBLE_PART=${INFLUXDB_TOKEN:0:4}
+        HIDDEN_PART=$(printf "%*s" $((TOKEN_LENGTH-4)) | tr ' ' '*')
+        echo "InfluxDB Token: $VISIBLE_PART$HIDDEN_PART"
+    else
+        echo -e "${YELLOW}InfluxDB Token: 未设置，使用配置文件中的值${NC}"
     fi
-fi
-
-# 检查InfluxDB连接
-curl -s "$INFLUX_URL/ping" > /dev/null
-if [ $? -ne 0 ]; then
-    echo "警告: 无法连接到InfluxDB服务器 $INFLUX_URL"
-    echo "请确保InfluxDB已启动并可访问"
-    # 不退出，因为可能是临时网络问题
 fi
 
 # 创建输出目录
 mkdir -p logs
 
-# 输出配置信息
-echo "启动SysLens服务器..."
-echo "配置文件: $CONFIG_PATH"
-echo "存储类型: InfluxDB"
-echo "InfluxDB URL: $INFLUX_URL"
-echo "InfluxDB 组织: $INFLUX_ORG"
-echo "InfluxDB Bucket: $INFLUX_BUCKET"
-echo "HTTP监听地址: $HTTP_ADDR"
+# 运行服务端
+echo -e "${GREEN}正在启动主控服务...${NC}"
 
-# 启动服务器
-go run cmd/server/main.go \
-    --config "$CONFIG_PATH" \
-    --storage influxdb \
-    --influx-url "$INFLUX_URL" \
-    --influx-token "$INFLUXDB_TOKEN" \
-    --influx-org "$INFLUX_ORG" \
-    --influx-bucket "$INFLUX_BUCKET" \
-    --addr "$HTTP_ADDR" 
+# 检测是否为开发模式
+if [ -z "$GO_ENV" ] || [ "$GO_ENV" = "development" ]; then
+    # 开发模式：使用go run
+    go run cmd/server/main.go
+else
+    # 生产模式：使用编译的二进制文件
+    if [ -f "bin/server" ]; then
+        ./bin/server
+    else
+        echo -e "${YELLOW}未找到编译后的二进制文件，切换到使用go run...${NC}"
+        go run cmd/server/main.go
+    fi
+fi 
