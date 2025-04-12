@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  server:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.server
+    container_name: syslens-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../configs/server.yaml:/app/configs/server.yaml
+      - server-data:/app/data
+      - server-logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+
+  agent:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.agent
+    container_name: syslens-agent
+    volumes:
+      - ../../configs/agent.yaml:/app/configs/agent.yaml
+      - agent-logs:/app/logs
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=Asia/Shanghai
+      - SERVER_URL=http://localhost:8080
+
+volumes:
+  server-data:
+  server-logs:
+  agent-logs: 

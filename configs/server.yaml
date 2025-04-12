@@ -1,0 +1,70 @@
+# SysLens主控端配置
+
+# 服务器配置
+server:
+  # HTTP服务监听地址
+  http_addr: "0.0.0.0:8080"
+  # 是否启用HTTPS
+  use_https: false
+  # HTTPS证书配置(如果use_https为true)
+  cert_file: "certs/server.crt"
+  key_file: "certs/server.key"
+
+# 存储配置
+storage:
+  # 存储类型: memory, file, influxdb
+  type: "memory"
+  # 内存存储配置
+  memory:
+    # 每个节点的最大存储条目数
+    max_items: 1000
+  # 文件存储配置
+  file:
+    # 存储目录
+    data_dir: "data/metrics"
+    # 文件滚动周期(小时)
+    rotate_hours: 24
+  # InfluxDB配置(如果使用)
+  influxdb:
+    url: "http://localhost:8086"
+    token: "your-influxdb-token"
+    org: "syslens"
+    bucket: "metrics"
+
+# 节点管理配置
+discovery:
+  # 节点过期时间(秒)
+  node_expiry: 300
+  # 是否自动移除过期节点
+  auto_remove_expired: true
+
+# 告警配置
+alerting:
+  # 是否启用告警
+  enabled: true
+  # 告警检查间隔(秒)
+  check_interval: 60
+  # 通知配置
+  notifiers:
+    # 邮件通知
+    email:
+      enabled: false
+      smtp_server: "smtp.example.com"
+      smtp_port: 587
+      username: "alerts@example.com"
+      password: "your-password"
+      from: "alerts@example.com"
+      to: [ "admin@example.com" ]
+    # Webhook通知
+    webhook:
+      enabled: false
+      url: "https://hooks.slack.com/services/xxx/yyy/zzz"
+
+# 日志配置
+logging:
+  # 日志级别: debug, info, warn, error
+  level: "info"
+  # 日志文件(留空表示输出到控制台)
+  file: "logs/server.log"
+  # 是否开启详细模式(包含文件和行号)
+  verbose: true

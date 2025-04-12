@@ -1,0 +1,45 @@
+FROM golang:1.16-alpine AS builder
+
+# 安装依赖
+RUN apk add --no-cache gcc musl-dev git
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖文件
+COPY go.mod go.sum ./
+
+# 下载依赖
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 构建
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-s -w" -o /go/bin/agent ./cmd/agent
+
+# 第二阶段：使用轻量级基础镜像
+FROM alpine:latest
+
+# 安装基本工具
+RUN apk --no-cache add ca-certificates tzdata \
+    && update-ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# 复制二进制文件
+COPY --from=builder /go/bin/agent /usr/local/bin/agent
+
+# 创建必要的目录
+RUN mkdir -p /app/configs /app/logs
+
+# 添加配置文件
+COPY --from=builder /app/configs/agent.yaml /app/configs/
+
+# 设置工作目录
+WORKDIR /app
+
+# 暴露端口（如果需要）
+# EXPOSE 9100
+
+# 启动命令
+CMD ["agent", "-config", "configs/agent.yaml"] 
