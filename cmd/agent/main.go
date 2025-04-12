@@ -2,15 +2,19 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/syslens/syslens-api/internal/agent/collector"
 	"github.com/syslens/syslens-api/internal/agent/reporter"
+	"github.com/syslens/syslens-api/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -27,7 +31,31 @@ func main() {
 	log.Printf("连接到服务器: %s\n", *serverAddr)
 	log.Printf("采集间隔: %d毫秒\n", *interval)
 
-	// TODO: 加载配置文件
+	// 加载配置文件
+	agentConfig, err := loadConfig(*configPath)
+	if err != nil {
+		log.Printf("警告: 无法加载配置文件，使用默认配置: %v\n", err)
+		// 创建默认配置
+		agentConfig = &config.AgentConfig{
+			Security: config.SecurityConfig{
+				Encryption: config.EncryptionConfig{
+					Enabled:   false,
+					Algorithm: "aes-256-gcm",
+					Key:       "",
+				},
+				Compression: config.CompressionConfig{
+					Enabled:   false,
+					Algorithm: "gzip",
+					Level:     6,
+				},
+			},
+		}
+	}
+
+	// 命令行参数覆盖配置文件
+	if *interval > 0 {
+		agentConfig.Collection.Interval = *interval
+	}
 
 	// 初始化指标收集器
 	systemCollector := collector.NewSystemCollector()
@@ -38,25 +66,65 @@ func main() {
 	if !*debug {
 		// 初始化数据上报模块
 		var serverURL string
-		// 检查serverAddr是否已包含协议前缀
-		if strings.HasPrefix(*serverAddr, "http://") || strings.HasPrefix(*serverAddr, "https://") {
-			serverURL = *serverAddr
+		// 优先使用命令行参数，否则使用配置文件
+		if *serverAddr != "localhost:8080" {
+			// 检查serverAddr是否已包含协议前缀
+			if strings.HasPrefix(*serverAddr, "http://") || strings.HasPrefix(*serverAddr, "https://") {
+				serverURL = *serverAddr
+			} else {
+				serverURL = "http://" + *serverAddr
+			}
+		} else if agentConfig.Server.URL != "" {
+			serverURL = agentConfig.Server.URL
 		} else {
-			serverURL = "http://" + *serverAddr
+			serverURL = "http://localhost:8080"
 		}
+
 		// 获取主机名作为节点ID
-		hostname, err := os.Hostname()
-		if err != nil {
-			hostname = "unknown-node"
+		nodeID := agentConfig.Node.ID
+		if nodeID == "" {
+			hostname, err := os.Hostname()
+			if err != nil {
+				hostname = "unknown-node"
+			}
+			nodeID = hostname
 		}
-		metricsReporter = reporter.NewHTTPReporter(serverURL, hostname)
+
+		// 创建HTTP上报器并附加安全配置
+		httpReporter := reporter.NewHTTPReporter(
+			serverURL,
+			nodeID,
+			reporter.WithRetryCount(agentConfig.Server.RetryCount),
+			reporter.WithRetryInterval(time.Duration(agentConfig.Server.RetryInterval)*time.Second),
+			reporter.WithTimeout(time.Duration(agentConfig.Server.Timeout)*time.Second),
+			reporter.WithSecurityConfig(&agentConfig.Security),
+		)
+
+		metricsReporter = httpReporter
 		log.Printf("数据上报模块初始化完成，目标服务器: %s\n", serverURL)
+
+		// 日志安全配置状态
+		if agentConfig.Security.Encryption.Enabled {
+			log.Printf("数据加密已启用，算法: %s", agentConfig.Security.Encryption.Algorithm)
+		} else {
+			log.Println("数据加密未启用")
+		}
+
+		if agentConfig.Security.Compression.Enabled {
+			log.Printf("数据压缩已启用，算法: %s, 级别: %d", agentConfig.Security.Compression.Algorithm, agentConfig.Security.Compression.Level)
+		} else {
+			log.Println("数据压缩未启用")
+		}
 	} else {
 		log.Println("调试模式启用，将只打印收集的数据而不上报")
 	}
 
+	// 设置实际的采集间隔
+	collectionInterval := time.Duration(agentConfig.Collection.Interval) * time.Millisecond
+	log.Printf("采用实际采集间隔: %v\n", collectionInterval)
+
 	// 启动定时采集任务
-	ticker := time.NewTicker(time.Duration(*interval) * time.Millisecond)
+	ticker := time.NewTicker(collectionInterval)
 	go func() {
 		// 立即执行一次采集
 		collectAndReport(systemCollector, metricsReporter, *debug)
@@ -75,6 +143,46 @@ func main() {
 	log.Println("节点代理正在关闭...")
 	ticker.Stop()
 	log.Println("节点代理已安全退出")
+}
+
+// loadConfig 从文件加载配置并支持环境变量替换
+func loadConfig(path string) (*config.AgentConfig, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// 环境变量替换
+	content := string(data)
+	re := regexp.MustCompile(`\${([^}]+)}`)
+	result := re.ReplaceAllStringFunc(content, func(match string) string {
+		// 提取变量名，去掉${}
+		envVar := match[2 : len(match)-1]
+
+		// 检查是否有默认值设置（格式：${ENV_VAR:-default}）
+		parts := strings.SplitN(envVar, ":-", 2)
+		envName := parts[0]
+
+		// 获取环境变量值
+		if val, exists := os.LookupEnv(envName); exists {
+			return val
+		}
+
+		// 如果环境变量不存在但有默认值，则使用默认值
+		if len(parts) > 1 {
+			return parts[1]
+		}
+
+		// 保持原样
+		return match
+	})
+
+	var cfg config.AgentConfig
+	if err := yaml.Unmarshal([]byte(result), &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
 }
 
 // collectAndReport 收集并上报系统指标
