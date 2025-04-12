@@ -17,7 +17,7 @@ func main() {
 	// 解析命令行参数
 	configPath := flag.String("config", "configs/agent.yaml", "配置文件路径")
 	serverAddr := flag.String("server", "localhost:8080", "主控服务器地址")
-	interval := flag.Int("interval", 30000, "数据采集间隔(毫秒)")
+	interval := flag.Int("interval", 500, "数据采集间隔(毫秒)")
 	debug := flag.Bool("debug", false, "调试模式(只打印不上报)")
 	flag.Parse()
 

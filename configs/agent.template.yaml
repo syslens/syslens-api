@@ -27,7 +27,7 @@ server:
 # 采集配置
 collection:
   # 采集间隔(毫秒)
-  interval: 30000
+  interval: 500
   # 开启的采集项
   enabled:
     cpu: true

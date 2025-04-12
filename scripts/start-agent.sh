@@ -5,7 +5,7 @@
 # 设置默认参数
 SERVER_URL=${SERVER_URL:-"localhost:8080"}  # 移除默认的http://前缀
 CONFIG_PATH=${CONFIG_PATH:-"configs/agent.yaml"}
-INTERVAL=${INTERVAL:-30000}  # 默认30000毫秒 (30秒)
+INTERVAL=${INTERVAL:-500}  # 默认500毫秒
 DEBUG=${DEBUG:-false}
 
 # 添加URL规范化处理
