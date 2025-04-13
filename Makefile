@@ -45,7 +45,8 @@ run-agent:
 
 # 生成文档
 docs:
-	@echo "暂未实现文档生成"
+	@echo "生成文档..."
+	@pandoc -f markdown -t docx -o PRODUCT.docx PRODUCT.md
 
 # 格式化代码
 fmt:
@@ -67,5 +68,6 @@ help:
 	@echo "  make clean           - 清理构建产物"
 	@echo "  make run-server      - 运行主控端(开发环境)"
 	@echo "  make run-agent       - 运行节点端(开发环境)"
+	@echo "  make docs            - 生成文档"
 	@echo "  make fmt             - 格式化代码"
 	@echo "  make lint            - 检查代码" 
