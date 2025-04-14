@@ -377,3 +377,235 @@ SysLens使用Apache 2.0许可证开源。
 - GitHub仓库：[https://github.com/syslens/syslens-api](https://github.com/syslens/syslens-api)
 - 文档网站：[https://docs.syslens.io](https://docs.syslens.io)
 - 问题反馈：[https://github.com/syslens/syslens-api/issues](https://github.com/syslens/syslens-api/issues)
+
+## 节点实时数据展示通信方案
+
+SysLens采用高效的实时数据通信机制，确保节点监控数据的实时性和低延迟展示：
+
+### 通信架构设计
+
+系统支持两种实时数据通信方式，可根据不同场景灵活选择：
+
+1. **WebSocket长连接**（推荐）：
+
+- 建立持久连接，服务器可主动推送数据
+- 低延迟，减少网络开销
+- 支持双向通信，客户端可发送控制命令
+- 适合需要高频率更新的场景（如毫秒级监控）
+
+2. **HTTP轮询**（备选方案）：
+
+- 客户端定期请求最新数据
+- 实现简单，兼容性好
+- 可配置轮询间隔，平衡实时性和服务器负载
+- 适合更新频率较低的场景
+
+### WebSocket实现细节
+
+1. **连接建立**：
+
+- 客户端通过`ws://<主控端IP>:8080/api/v1/ws/nodes`建立WebSocket连接
+- 连接时携带节点ID和认证令牌：`ws://<主控端IP>:8080/api/v1/ws/nodes?node_id=node-001&token=xxx`
+- 服务器验证连接后，开始推送该节点的实时数据
+
+2. **数据推送格式**：
+
+```json
+{
+  "type": "metrics",
+  "node_id": "node-001",
+  "timestamp": 1621234567890,
+  "data": {
+    "cpu": {
+      "usage": 45.2,
+      "cores": 8,
+      "load": [1.2, 1.5, 1.8]
+    },
+    "memory": {
+      "total": 16384,
+      "used": 8192,
+      "free": 8192,
+      "usage": 50.0
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "eth0",
+          "bytes_sent": 1024000,
+          "bytes_recv": 2048000,
+          "packets_sent": 1000,
+          "packets_recv": 2000
+        }
+      ]
+    },
+    "disk": {
+      "partitions": [
+        {
+          "device": "/dev/sda1",
+          "mountpoint": "/",
+          "total": 512000,
+          "used": 256000,
+          "free": 256000,
+          "usage": 50.0
+        }
+      ]
+    }
+  }
+}
+```
+
+3. **控制命令**：
+
+客户端可发送控制命令调整数据推送：
+
+```json
+{
+  "command": "set_interval",
+  "interval": 1000  // 毫秒
+}
+```
+
+4. **心跳机制**：
+
+- 服务器每30秒发送一次心跳消息
+- 客户端需在60秒内响应心跳，否则连接将被关闭
+- 心跳消息格式：`{"type": "ping", "timestamp": 1621234567890}`
+
+### HTTP轮询实现细节
+
+1. **数据获取接口**：
+
+- 端点：`GET /api/v1/nodes/{node_id}/metrics`
+- 支持查询参数：`?interval=1000&metrics=cpu,memory,network`
+- 响应格式与WebSocket相同
+
+2. **轮询优化**：
+
+- 支持条件请求（If-None-Match/If-Modified-Since）
+- 服务器返回304状态码表示数据未变化
+- 客户端可根据数据变化情况动态调整轮询间隔
+
+3. **批量获取**：
+
+- 支持一次请求多个节点的数据：`GET /api/v1/nodes/metrics?node_ids=node-001,node-002`
+- 减少HTTP请求数量，提高效率
+
+### 前端实现示例
+
+```javascript
+// WebSocket连接示例
+class NodeMetricsClient {
+  constructor(nodeId, token, onData) {
+    this.nodeId = nodeId;
+    this.token = token;
+    this.onData = onData;
+    this.ws = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+  }
+
+  connect() {
+    const url = `ws://${window.location.hostname}:8080/api/v1/ws/nodes?node_id=${this.nodeId}&token=${this.token}`;
+    this.ws = new WebSocket(url);
+    
+    this.ws.onopen = () => {
+      console.log('WebSocket连接已建立');
+      this.reconnectAttempts = 0;
+    };
+    
+    this.ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'metrics') {
+        this.onData(data.data);
+      } else if (data.type === 'ping') {
+        this.ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+      }
+    };
+    
+    this.ws.onclose = () => {
+      console.log('WebSocket连接已关闭');
+      this.reconnect();
+    };
+    
+    this.ws.onerror = (error) => {
+      console.error('WebSocket错误:', error);
+    };
+  }
+
+  reconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
+    } else {
+      console.error('达到最大重连次数，请刷新页面重试');
+    }
+  }
+
+  setInterval(interval) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        command: 'set_interval',
+        interval: interval
+      }));
+    }
+  }
+
+  disconnect() {
+    if (this.ws) {
+      this.ws.close();
+    }
+  }
+}
+
+// 使用示例
+const client = new NodeMetricsClient('node-001', 'auth-token', (data) => {
+  // 更新UI显示节点数据
+  updateNodeMetricsUI(data);
+});
+
+client.connect();
+
+// 设置数据更新间隔为1秒
+client.setInterval(1000);
+
+// 组件卸载时断开连接
+function cleanup() {
+  client.disconnect();
+}
+```
+
+### 性能优化策略
+
+1. **数据压缩**：
+
+- WebSocket消息使用gzip压缩
+- 减少网络传输量，提高传输效率
+
+2. **增量更新**：
+
+- 只传输发生变化的数据字段
+- 大幅减少数据传输量
+
+3. **批量处理**：
+
+- 服务器端对短时间内的多次更新进行合并
+- 减少推送频率，降低服务器和客户端负载
+
+4. **自适应频率**：
+
+- 根据数据变化率动态调整推送频率
+- 稳定数据降低频率，波动数据提高频率
+
+5. **数据缓存**：
+
+- 客户端缓存历史数据
+- 支持时间范围查询和趋势分析
+
+### 选择建议
+
+- **高频率监控场景**（毫秒级）：使用WebSocket
+- **多节点同时监控**：使用WebSocket，减少连接数
+- **简单场景或兼容性要求高**：使用HTTP轮询
+- **移动端或弱网络环境**：使用HTTP轮询，更可靠
+- **大规模部署**：根据节点数量和网络条件选择，可混合使用
