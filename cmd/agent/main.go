@@ -103,6 +103,9 @@ func main() {
 			} else {
 				serverURL = "http://" + *serverAddr
 			}
+		} else if agentConfig.Aggregator.Enabled && agentConfig.Aggregator.URL != "" {
+			// 如果启用了聚合服务器，优先使用聚合服务器地址
+			serverURL = agentConfig.Aggregator.URL
 		} else if agentConfig.Server.URL != "" {
 			serverURL = agentConfig.Server.URL
 		} else {
@@ -128,6 +131,11 @@ func main() {
 			reporter.WithTimeout(time.Duration(agentConfig.Server.Timeout)*time.Second),
 			reporter.WithSecurityConfig(&agentConfig.Security),
 		)
+
+		// 如果启用了聚合服务器，设置认证令牌
+		if agentConfig.Aggregator.Enabled && agentConfig.Aggregator.AuthToken != "" {
+			httpReporter.SetAuthToken(agentConfig.Aggregator.AuthToken)
+		}
 
 		metricsReporter = httpReporter
 		log.Printf("数据上报模块初始化完成，目标服务器: %s\n", serverURL)
