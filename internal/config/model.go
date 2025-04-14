@@ -2,11 +2,12 @@ package config
 
 // AgentConfig 节点代理配置结构
 type AgentConfig struct {
-	Node       NodeConfig       `yaml:"node"`
-	Server     ServerConnection `yaml:"server"`
-	Security   SecurityConfig   `yaml:"security"`
-	Collection CollectionConfig `yaml:"collection"`
-	Logging    LoggingConfig    `yaml:"logging"`
+	Node       NodeConfig            `yaml:"node"`
+	Server     ServerConnection      `yaml:"server"`
+	Security   SecurityConfig        `yaml:"security"`
+	Collection CollectionConfig      `yaml:"collection"`
+	Logging    LoggingConfig         `yaml:"logging"`
+	Aggregator AgentAggregatorConfig `yaml:"aggregator"`
 }
 
 // NodeConfig 节点信息配置
@@ -88,14 +89,35 @@ type LoggingConfig struct {
 	Verbose bool   `yaml:"verbose"`
 }
 
+// AgentAggregatorConfig 节点端聚合服务器配置
+type AgentAggregatorConfig struct {
+	// 是否启用聚合服务器功能
+	Enabled bool `yaml:"enabled"`
+	// 聚合服务器地址
+	URL string `yaml:"url"`
+	// 认证令牌
+	AuthToken string `yaml:"auth_token"`
+	// 心跳超时时间(秒)
+	HeartbeatTimeout int `yaml:"heartbeat_timeout"`
+	// 上报间隔(毫秒)
+	ReportInterval int `yaml:"report_interval"`
+	// 重试次数
+	RetryCount int `yaml:"retry_count"`
+	// 重试间隔(秒)
+	RetryInterval int `yaml:"retry_interval"`
+	// 超时时间(秒)
+	Timeout int `yaml:"timeout"`
+}
+
 // ServerConfig 主控端配置结构
 type ServerConfig struct {
-	Server    HTTPServerConfig `yaml:"server"`
-	Security  SecurityConfig   `yaml:"security"`
-	Storage   StorageConfig    `yaml:"storage"`
-	Discovery DiscoveryConfig  `yaml:"discovery"`
-	Alerting  AlertingConfig   `yaml:"alerting"`
-	Logging   LoggingConfig    `yaml:"logging"`
+	Server     HTTPServerConfig       `yaml:"server"`
+	Security   SecurityConfig         `yaml:"security"`
+	Storage    StorageConfig          `yaml:"storage"`
+	Discovery  DiscoveryConfig        `yaml:"discovery"`
+	Alerting   AlertingConfig         `yaml:"alerting"`
+	Logging    LoggingConfig          `yaml:"logging"`
+	Aggregator AggregatorClientConfig `yaml:"aggregator"`
 }
 
 // HTTPServerConfig HTTP服务器配置
@@ -177,4 +199,16 @@ type EmailNotifier struct {
 type WebhookNotifier struct {
 	Enabled bool   `yaml:"enabled"`
 	URL     string `yaml:"url"`
+}
+
+// AggregatorClientConfig 聚合服务器客户端配置
+type AggregatorClientConfig struct {
+	// 认证令牌
+	AuthToken string `yaml:"auth_token"`
+	// 是否启用聚合服务器功能
+	Enabled bool `yaml:"enabled"`
+	// 心跳超时时间(秒)
+	HeartbeatTimeout int `yaml:"heartbeat_timeout"`
+	// 数据上报间隔(秒)
+	ReportInterval int `yaml:"report_interval"`
 }
