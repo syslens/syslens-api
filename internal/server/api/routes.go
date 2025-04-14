@@ -10,7 +10,7 @@ func SetupRoutes(handler *MetricsHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// 节点上报指标
-	mux.HandleFunc("/api/v1/metrics", handler.HandleMetricsSubmit)
+	mux.HandleFunc("/api/v1/nodes/:node_id/metrics", handler.HandleMetricsSubmit)
 
 	// 获取节点指标
 	mux.HandleFunc("/api/v1/nodes/metrics", handler.HandleGetNodeMetrics)
