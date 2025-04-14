@@ -1,0 +1,39 @@
+# 聚合服务器配置模板
+
+# 服务器配置
+server:
+  # 监听地址，格式：IP:端口
+  listen_addr: "0.0.0.0:8081"
+  # 最大连接数
+  max_connections: 1000
+  # 连接超时时间（秒）
+  connection_timeout: 30
+
+# 主控端配置
+control_plane:
+  # 主控端地址
+  url: "http://localhost:8080"
+  # 认证令牌（从主控端获取）
+  token: "your-token-here"
+  # 重试次数
+  retry_count: 5
+  # 重试间隔（秒）
+  retry_interval: 5
+
+# 数据处理配置
+processing:
+  # 批处理大小
+  batch_size: 100
+  # 批处理间隔（毫秒）
+  batch_interval: 1000
+  # 数据保留时间（小时）
+  retention_hours: 24
+
+# 日志配置
+log:
+  # 日志级别：debug, info, warn, error
+  level: "info"
+  # 日志文件路径
+  file: "logs/aggregator.log"
+  # 是否输出到控制台
+  console: true
