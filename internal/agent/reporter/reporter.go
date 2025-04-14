@@ -27,6 +27,7 @@ type HTTPReporter struct {
 	client        *http.Client  // HTTP客户端
 	retryCount    int           // 重试次数
 	retryInterval time.Duration // 重试间隔
+	authToken     string        // 认证令牌
 
 	securityConfig *config.SecurityConfig   // 安全配置
 	encryptionSvc  *utils.EncryptionService // 加密服务
@@ -109,6 +110,18 @@ func WithSecurityConfig(secConfig *config.SecurityConfig) func(*HTTPReporter) {
 	}
 }
 
+// WithAuthToken 设置认证令牌
+func WithAuthToken(token string) func(*HTTPReporter) {
+	return func(r *HTTPReporter) {
+		r.authToken = token
+	}
+}
+
+// SetAuthToken 设置认证令牌
+func (r *HTTPReporter) SetAuthToken(token string) {
+	r.authToken = token
+}
+
 // Report 将数据上报到服务器
 func (r *HTTPReporter) Report(data interface{}) error {
 	jsonData, err := json.Marshal(data)
@@ -132,7 +145,18 @@ func (r *HTTPReporter) Report(data interface{}) error {
 			time.Sleep(retryDelay)
 		}
 
-		req, err := http.NewRequest("POST", r.serverURL+"/api/v1/metrics", bytes.NewBuffer(processedData))
+		// 构建请求URL
+		nodeID := r.nodeID
+		if nodeID == "" {
+			if hostname, err := os.Hostname(); err == nil {
+				nodeID = hostname
+			} else {
+				nodeID = "unknown-node"
+			}
+		}
+		url := fmt.Sprintf("%s/api/v1/nodes/%s/metrics", r.serverURL, nodeID)
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(processedData))
 		if err != nil {
 			lastErr = fmt.Errorf("创建HTTP请求失败: %w", err)
 			log.Printf("重试失败: %v", lastErr)
@@ -144,15 +168,12 @@ func (r *HTTPReporter) Report(data interface{}) error {
 		req.Header.Set("User-Agent", "SysLens-Agent")
 
 		// 添加节点ID头部
-		nodeID := r.nodeID
-		if nodeID == "" {
-			if hostname, err := os.Hostname(); err == nil {
-				nodeID = hostname
-			} else {
-				nodeID = "unknown-node"
-			}
-		}
 		req.Header.Set("X-Node-ID", nodeID)
+
+		// 添加认证令牌
+		if r.authToken != "" {
+			req.Header.Set("Authorization", "Bearer "+r.authToken)
+		}
 
 		// 添加数据处理标记
 		if r.securityConfig.Compression.Enabled {
