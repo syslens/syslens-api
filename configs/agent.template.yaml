@@ -22,7 +22,16 @@ server:
   # 重试次数
   retry_count: 3
   # 重试间隔(秒)
-  retry_interval: ${RETRY_INTERVAL:-1}
+  retry_interval: ${RETRY_INTERVAL:-2}
+
+# 聚合服务器配置
+aggregator:
+  # 是否启用聚合服务器
+  enabled: true
+  # 聚合服务器地址
+  url: "${AGGREGATOR_URL:-http://localhost:8081}"
+  # 聚合服务器认证令牌
+  auth_token: "${AGGREGATOR_TOKEN:-}"
 
 # 数据安全配置
 security:
@@ -75,9 +84,17 @@ collection:
 
 # 日志配置
 logging:
-  # 日志级别: debug, info, warn, error
+  # 日志级别(debug/info/warn/error)
   level: "${LOG_LEVEL:-info}"
-  # 日志文件(留空表示输出到控制台)
-  file: "${LOG_FILE:-logs/agent.log}"
-  # 是否开启详细模式
-  verbose: false
+  # 日志文件路径
+  file: "${LOG_FILE:-/var/log/syslens/agent.log}"
+  # 是否输出到控制台
+  console: true
+  # 日志轮转配置
+  rotation:
+    # 最大文件大小(MB)
+    max_size: 100
+    # 最大保留文件数
+    max_files: 10
+    # 最大保留天数
+    max_days: 30
