@@ -57,6 +57,17 @@ discovery:
   # 是否自动移除过期节点
   auto_remove_expired: true
 
+# 聚合服务器配置
+aggregator:
+  # 聚合服务器认证令牌
+  auth_token: "${SYSLENS_AGGREGATOR_AUTH_TOKEN:-default_aggregator_token}"
+  # 是否启用聚合服务器功能
+  enabled: true
+  # 聚合服务器心跳超时时间(秒)
+  heartbeat_timeout: 60
+  # 聚合服务器数据上报间隔(秒)
+  report_interval: 10
+
 # 告警配置
 alerting:
   # 是否启用告警
