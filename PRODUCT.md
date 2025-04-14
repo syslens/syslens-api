@@ -46,13 +46,13 @@ SysLens采用双层数据存储架构：
 - 密钥使用AES-256加密并存储在PostgreSQL数据库中
 - Web界面生成包含密钥的一键安装命令
 
-1. 节点认证流程：
+2. 节点认证流程：
 
 - 节点首次连接时使用分配的密钥进行认证
 - 认证成功后，节点从主控端获取完整配置
 - 后续通信继续使用该密钥进行加密和身份验证
 
-1. 配置下发机制：
+3. 配置下发机制：
 
 - 节点配置集中存储在主控端
 - 首次连接和配置变更时自动下发到节点
@@ -78,7 +78,7 @@ Web前端提供丰富的功能：
 - 节点管理：添加、配置和管理监控节点
 - 告警中心：查看和处理系统告警
 - 报告生成：创建和导出性能报告
-- 系统设置：全局配置管理
+- 系统设置：全局配置和个人偏好设置
 
 #### API服务
 
@@ -123,19 +123,19 @@ SysLens提供简化的节点部署方式，通过以下步骤快速将服务器�
 - 填写节点基本信息（名称、描述、角色等）
 - 点击"创建"完成节点创建
 
-1. 获取安装命令：
+2. 获取安装命令：
 
 - 系统自动生成包含专属密钥的安装命令
-- 示例：curl -sSL [https://syslens-server/install.sh](https://syslens-server/install.sh) | bash -s-- --token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+- 示例：`curl -sSL https://syslens-server/install.sh | bash -s -- --token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 
-1. 执行安装：
+3. 执行安装：
 
 - 在目标服务器上执行安装命令
 - 节点代理自动安装并启动
 - 首次通信使用token进行身份验证
 - 验证成功后从主控端获取完整配置
 
-1. 验证连接：
+4. 验证连接：
 
 - Web界面显示节点状态变为"在线"
 - 开始接收和显示该节点的监控数据
@@ -146,8 +146,8 @@ SysLens提供简化的节点部署方式，通过以下步骤快速将服务器�
 
 - 编程语言：Go 1.18+
 - Web框架：Gin/Echo
-- API通信：REST API+ WebSocket
-- 时序数据库：InfluxDB2.x
+- API通信：REST API + WebSocket
+- 时序数据库：InfluxDB 2.x
 - 结构化数据库：PostgreSQL
 - 缓存系统：Redis(可选)
 - 消息队列：NATS (可选，用于大规模部署)
@@ -194,41 +194,27 @@ SysLens提供全面的数据安全保障：
 
 #### 方式一：Docker部署（推荐）
 
-bash
-
-Apply to [README.md](http://README.md)
-
-Run
-
-#  拉取并启动SysLens主控端
-
-docker-compose-fdeployments/docker/docker-compose.ymlup-d
+```bash
+# 拉取并启动SysLens主控端
+docker-compose -f deployments/docker/docker-compose.yml up -d
+```
 
 #### 方式二：从源码构建
 
-bash
-
-Apply to [README.md](http://README.md)
-
-Run
-
-gitclonehttps://github.com/syslens/syslens-api.git
-
-cdsyslens-api
-
-makebuild-all
-
+```bash
+git clone https://github.com/syslens/syslens-api.git
+cd syslens-api
+make build-all
 ./scripts/start-server-with-db.sh
+```
 
 ### 访问Web界面
 
 安装完成后，访问主控端Web界面：
 
-text
-
-Apply to [README.md](http://README.md)
-
-[http://<主控端IP>:8080](http://<主控端IP>:8080)
+```
+http://<主控端IP>:8080
+```
 
 初次访问需要创建管理员账号。
 
