@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="750" viewBox="0 0 1200 750" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <style>
+    .title { font-size: 28px; font-weight: bold; fill: #222; }
+    .subtitle { font-size: 18px; font-weight: bold; fill: #444; }
+    .box { fill: #f8fafd; stroke: #4a90e2; stroke-width: 2; rx: 12; }
+    .db { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 2; rx: 10; }
+    .queue { fill: #fffbe6; stroke: #f5a623; stroke-width: 2; rx: 10; }
+    .cache { fill: #e8f5e9; stroke: #43a047; stroke-width: 2; rx: 10; }
+    .arrow { stroke: #888; stroke-width: 2; marker-end: url(#arrowhead); }
+    .dashed { stroke-dasharray: 8 4; }
+    .label { font-size: 15px; fill: #333; }
+    .small { font-size: 13px; fill: #666; }
+    .api { fill: #e3f2fd; stroke: #1976d2; stroke-width: 1.5; rx: 8; }
+    .agent { fill: #fff3e0; stroke: #fb8c00; stroke-width: 1.5; rx: 8; }
+    .frontend { fill: #e8eaf6; stroke: #5c6bc0; stroke-width: 1.5; rx: 8; }
+    .aggregator { fill: #f3e5f5; stroke: #8e24aa; stroke-width: 2; rx: 12; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- 标题 -->
+  <text x="600" y="45" text-anchor="middle" class="title">SysLens 分布式服务器监控系统架构图</text>
+
+  <!-- 主控端 -->
+  <rect x="600" y="120" width="320" height="220" class="box"/>
+  <text x="760" y="150" text-anchor="middle" class="subtitle">主控端 Control Plane</text>
+  <!-- API服务 -->
+  <rect x="620" y="170" width="120" height="40" class="api"/>
+  <text x="680" y="195" text-anchor="middle" class="label">API服务</text>
+  <!-- 节点管理 -->
+  <rect x="620" y="220" width="120" height="40" class="api"/>
+  <text x="680" y="245" text-anchor="middle" class="label">节点管理</text>
+  <!-- 告警系统 -->
+  <rect x="760" y="170" width="140" height="40" class="api"/>
+  <text x="830" y="195" text-anchor="middle" class="label">告警系统</text>
+  <!-- 可视化接口 -->
+  <rect x="760" y="220" width="140" height="40" class="api"/>
+  <text x="830" y="245" text-anchor="middle" class="label">可视化接口</text>
+  <!-- 存储层 -->
+  <rect x="720" y="280" width="120" height="40" class="api"/>
+  <text x="780" y="305" text-anchor="middle" class="label">存储层</text>
+
+  <!-- 聚合服务器 -->
+  <rect x="350" y="160" width="180" height="140" class="aggregator"/>
+  <text x="440" y="185" text-anchor="middle" class="subtitle" fill="#8e24aa">聚合服务器 Aggregator</text>
+  <rect x="370" y="210" width="140" height="35" class="aggregator"/>
+  <text x="440" y="233" text-anchor="middle" class="label">数据聚合/转发</text>
+  <rect x="370" y="255" width="140" height="35" class="aggregator"/>
+  <text x="440" y="278" text-anchor="middle" class="label">批量处理/缓冲</text>
+  <!-- 多台聚合服务器虚线框 -->
+  <rect x="340" y="150" width="200" height="160" fill="none" stroke="#8e24aa" stroke-width="1.5" class="dashed"/>
+  <text x="540" y="160" class="small" fill="#8e24aa">可多台部署</text>
+
+  <!-- 节点端 -->
+  <rect x="60" y="120" width="220" height="220" class="agent"/>
+  <text x="170" y="150" text-anchor="middle" class="subtitle">节点端 Node Agent</text>
+  <!-- 指标收集器 -->
+  <rect x="80" y="180" width="180" height="40" class="agent"/>
+  <text x="170" y="205" text-anchor="middle" class="label">指标收集器</text>
+  <!-- 上报模块 -->
+  <rect x="80" y="230" width="180" height="40" class="agent"/>
+  <text x="170" y="255" text-anchor="middle" class="label">上报模块</text>
+  <!-- 配置同步 -->
+  <rect x="80" y="280" width="180" height="40" class="agent"/>
+  <text x="170" y="305" text-anchor="middle" class="label">配置同步</text>
+
+  <!-- Web前端 -->
+  <rect x="980" y="120" width="200" height="120" class="frontend"/>
+  <text x="1080" y="150" text-anchor="middle" class="subtitle">Web前端</text>
+  <rect x="1000" y="180" width="160" height="40" class="frontend"/>
+  <text x="1080" y="205" text-anchor="middle" class="label">仪表盘/管理界面</text>
+
+  <!-- InfluxDB -->
+  <rect x="720" y="400" width="120" height="50" class="db"/>
+  <text x="780" y="430" text-anchor="middle" class="label">InfluxDB</text>
+  <text x="780" y="445" text-anchor="middle" class="small">时序数据</text>
+  <!-- PostgreSQL -->
+  <rect x="880" y="400" width="120" height="50" class="db"/>
+  <text x="940" y="430" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="940" y="445" text-anchor="middle" class="small">结构化数据</text>
+  <!-- Redis -->
+  <rect x="1040" y="400" width="100" height="50" class="cache"/>
+  <text x="1090" y="430" text-anchor="middle" class="label">Redis</text>
+  <text x="1090" y="445" text-anchor="middle" class="small">缓存(可选)</text>
+  <!-- NATS -->
+  <rect x="1040" y="480" width="100" height="50" class="queue"/>
+  <text x="1090" y="510" text-anchor="middle" class="label">NATS</text>
+  <text x="1090" y="525" text-anchor="middle" class="small">消息队列(可选)</text>
+
+  <!-- 箭头：节点端 -> 聚合服务器 -->
+  <line x1="280" y1="210" x2="350" y2="210" class="arrow"/>
+  <text x="315" y="200" text-anchor="middle" class="small">加密/压缩数据上报</text>
+  <!-- 箭头：聚合服务器 -> 主控端 -->
+  <line x1="540" y1="210" x2="620" y2="190" class="arrow"/>
+  <text x="580" y="180" text-anchor="middle" class="small">聚合后上报</text>
+  <!-- 箭头：主控端 -> 聚合服务器（配置/控制） -->
+  <line x1="620" y1="260" x2="540" y2="270" class="arrow"/>
+  <text x="580" y="285" text-anchor="middle" class="small">配置/控制</text>
+  <!-- 箭头：聚合服务器 -> 节点端（配置下发） -->
+  <line x1="350" y1="300" x2="280" y2="320" class="arrow"/>
+  <text x="315" y="335" text-anchor="middle" class="small">配置下发</text>
+  <!-- 箭头：主控端 -> Web前端 -->
+  <line x1="920" y1="200" x2="980" y2="200" class="arrow"/>
+  <text x="950" y="190" text-anchor="middle" class="small">API/WS</text>
+  <!-- 箭头：Web前端 -> 主控端 -->
+  <line x1="980" y1="220" x2="920" y2="240" class="arrow"/>
+  <text x="950" y="250" text-anchor="middle" class="small">管理/查询</text>
+  <!-- 箭头：主控端 -> InfluxDB -->
+  <line x1="780" y1="340" x2="780" y2="400" class="arrow"/>
+  <text x="795" y="370" class="small">监控指标</text>
+  <!-- 箭头：主控端 -> PostgreSQL -->
+  <line x1="880" y1="320" x2="940" y2="400" class="arrow"/>
+  <text x="910" y="370" class="small">节点/用户/配置</text>
+  <!-- 箭头：主控端 -> Redis -->
+  <line x1="960" y1="320" x2="1090" y2="400" class="arrow"/>
+  <text x="1030" y="370" class="small">缓存</text>
+  <!-- 箭头：主控端 -> NATS -->
+  <line x1="960" y1="340" x2="1090" y2="480" class="arrow"/>
+  <text x="1030" y="460" class="small">消息推送</text>
+
+  <!-- 说明区 -->
+  <rect x="60" y="560" width="1080" height="170" fill="#f9fbe7" stroke="#cddc39" stroke-width="1.5" rx="12"/>
+  <text x="80" y="590" class="label">说明：</text>
+  <text x="80" y="615" class="small">1. 节点端(Node Agent)可将数据直接上报主控端，也可先汇聚到聚合服务器（Aggregator），适用于大规模/跨地域部署。</text>
+  <text x="80" y="635" class="small">2. 聚合服务器负责数据聚合、批量处理、缓冲和转发，支持多台部署，提升系统扩展性和吞吐能力。</text>
+  <text x="80" y="655" class="small">3. 主控端(Control Plane)负责接收、存储、分析数据，管理节点、分组、告警、配置下发，并为Web前端和API客户端提供服务。</text>
+  <text x="80" y="675" class="small">4. Web前端通过API/WS与主控端交互，展示仪表盘、节点管理、分组、告警等功能。</text>
+  <text x="80" y="695" class="small">5. 监控指标数据存储于InfluxDB，结构化数据（节点、用户、配置等）存储于PostgreSQL，Redis用于缓存，NATS用于消息推送（可选）。</text>
+  <text x="80" y="715" class="small">6. 所有通信均支持加密，节点认证基于密钥，支持分组管理与固定服务迁移。</text>
+</svg>
