@@ -173,39 +173,253 @@ type User struct {
 
 ## 项目结构
 
-SysLens 项目遵循标准的 Go 项目布局：
+SysLens 项目遵循标准的 Go 项目布局，主要目录结构如下：
 
 ```
 syslens-api/
-├── cmd/                    # 可执行文件入口
-│   ├── server/             # 主控端入口
+├── .github/                 # GitHub 相关配置
+│   ├── workflows/           # GitHub Actions 工作流配置
+│   └── ISSUE_TEMPLATE/      # Issue 模板
+├── api/                     # API 契约定义
+│   ├── proto/               # Protocol Buffers 定义
+│   ├── openapi/             # OpenAPI/Swagger 定义
+│   └── graphql/             # GraphQL schema 定义
+├── build/                   # 构建相关配置和脚本
+│   ├── ci/                  # CI 配置
+│   ├── package/             # 打包脚本
+│   └── docker/              # Docker 构建文件
+├── cmd/                     # 可执行文件入口
+│   ├── server/              # 主控端入口
 │   │   └── main.go
-│   ├── agent/              # 节点端入口
+│   ├── agent/               # 节点端入口
 │   │   └── main.go
-│   └── collectors/         # 辅助工具
-├── internal/               # 内部私有代码
-│   ├── agent/              # 节点端核心逻辑
-│   ├── server/             # 主控端核心逻辑
-│   ├── common/             # 公共代码
-│   └── config/             # 配置处理
-├── pkg/                    # 可被外部项目引用的库
-├── api/                    # API契约定义
-├── web/                    # 前端资源
-├── configs/                # 配置文件模板
-├── deployments/            # 部署配置
-├── scripts/                # 构建和辅助脚本
-├── migrations/             # 数据库迁移脚本
-├── docs/                   # 项目文档
-└── test/                   # 集成测试与测试工具
+│   ├── aggregator/          # 聚合服务器入口
+│   │   └── main.go
+│   └── collectors/          # 辅助工具
+│       └── collect_stats.go
+├── configs/                 # 配置文件模板
+│   ├── server.yaml          # 主控端配置
+│   ├── agent.yaml           # 节点端配置
+│   └── aggregator.yaml      # 聚合服务器配置
+├── deployments/             # 部署配置
+│   ├── docker/              # Docker 相关配置
+│   │   ├── Dockerfile.server
+│   │   ├── Dockerfile.agent
+│   │   └── docker-compose.yml
+│   ├── kubernetes/          # K8s 资源定义
+│   │   ├── server/
+│   │   ├── agent/
+│   │   └── aggregator/
+│   └── terraform/           # 基础设施即代码
+├── docs/                    # 项目文档
+│   ├── architecture.md      # 架构设计文档
+│   ├── api.md               # API 使用文档
+│   ├── deployment.md        # 部署指南
+│   └── development.md       # 开发指南
+├── examples/                # 使用示例
+│   ├── basic/               # 基础使用示例
+│   ├── advanced/            # 高级功能示例
+│   └── integration/         # 集成示例
+├── internal/                # 内部私有代码
+│   ├── agent/               # 节点端核心逻辑
+│   │   ├── collector/       # 系统指标收集
+│   │   ├── reporter/        # 数据上报模块
+│   │   └── config/          # 节点配置
+│   ├── aggregator/          # 聚合服务器逻辑
+│   │   ├── collector/       # 节点数据收集
+│   │   ├── processor/       # 数据处理器
+│   │   └── forwarder/       # 数据转发器
+│   ├── server/              # 主控端核心逻辑
+│   │   ├── api/             # HTTP/gRPC API 接口
+│   │   ├── auth/            # 认证与授权
+│   │   ├── handler/         # 请求处理器
+│   │   └── middleware/      # 中间件
+│   ├── common/              # 公共代码
+│   │   ├── models/          # 数据模型定义
+│   │   ├── utils/           # 通用工具函数
+│   │   └── constants/       # 常量定义
+│   ├── alerting/            # 告警规则与通知
+│   │   ├── engine/          # 告警引擎
+│   │   ├── rules/           # 告警规则
+│   │   └── notifier/        # 通知器
+│   ├── dashboard/           # 数据可视化接口
+│   │   ├── api/             # 仪表盘 API
+│   │   └── renderer/        # 数据渲染器
+│   ├── discovery/           # 节点注册与发现
+│   │   ├── registry/        # 节点注册表
+│   │   └── health/          # 健康检查
+│   ├── telemetry/           # 指标、日志、追踪
+│   │   ├── metrics/         # 指标收集
+│   │   ├── logger/          # 日志处理
+│   │   └── tracer/          # 分布式追踪
+│   ├── storage/             # 数据存储层
+│   │   ├── influxdb/        # InfluxDB 存储
+│   │   ├── postgres/        # PostgreSQL 存储
+│   │   └── cache/           # 缓存层
+│   └── config/              # 配置处理
+│       ├── loader/          # 配置加载器
+│       └── validator/       # 配置验证器
+├── migrations/              # 数据库迁移脚本
+│   ├── influxdb/            # InfluxDB 迁移
+│   └── postgres/            # PostgreSQL 迁移
+├── pkg/                     # 可被外部项目引用的库
+│   ├── client/              # 客户端库
+│   ├── models/              # 公共数据模型
+│   └── utils/               # 公共工具函数
+├── scripts/                 # 构建和辅助脚本
+│   ├── build.sh             # 构建脚本
+│   ├── deploy.sh            # 部署脚本
+│   └── test.sh              # 测试脚本
+├── test/                    # 集成测试与测试工具
+│   ├── integration/         # 集成测试
+│   ├── benchmark/           # 性能测试
+│   └── fixtures/            # 测试数据
+├── tools/                   # 开发工具和辅助脚本
+│   ├── lint/                # 代码检查工具
+│   ├── mock/                # 模拟生成器
+│   └── proto/               # Protocol Buffers 工具
+├── web/                     # 前端资源
+│   ├── static/              # 静态资源文件
+│   ├── templates/           # HTML 模板
+│   └── src/                 # 前端源代码
+├── .gitignore               # Git 忽略文件
+├── .golangci.yml            # golangci-lint 配置
+├── Dockerfile               # 主 Dockerfile
+├── Makefile                 # Make 构建脚本
+├── README.md                # 项目说明文档
+├── CONTRIBUTING.md          # 贡献指南
+├── LICENSE                  # 许可证
+├── go.mod                   # Go 模块定义
+└── go.sum                   # 依赖版本锁定
 ```
 
-### 包组织原则
+### 目录说明
 
-- 按功能而非层次组织包
-- 避免循环依赖
-- 保持包的粒度适中，避免过大或过小
-- 相关的功能放在同一个包中
-- 使用 `internal` 目录存放不希望被外部导入的代码
+#### 核心目录
+
+1. **`cmd/`**：包含项目的主要入口点
+   - `server/`：主控端服务入口
+   - `agent/`：节点端服务入口
+   - `aggregator/`：聚合服务器入口
+   - `collectors/`：辅助工具入口
+
+2. **`internal/`**：私有应用程序和库代码
+   - `agent/`：节点端核心逻辑
+   - `aggregator/`：聚合服务器逻辑
+   - `server/`：主控端核心逻辑
+   - `common/`：公共代码
+   - `alerting/`：告警规则与通知
+   - `dashboard/`：数据可视化接口
+   - `discovery/`：节点注册与发现
+   - `telemetry/`：指标、日志、追踪
+   - `storage/`：数据存储层
+   - `config/`：配置处理
+
+3. **`pkg/`**：可以被外部应用程序使用的库代码
+   - `client/`：客户端库
+   - `models/`：公共数据模型
+   - `utils/`：公共工具函数
+
+4. **`api/`**：API 协议定义、OpenAPI/Swagger 规范等
+   - `proto/`：Protocol Buffers 定义
+   - `openapi/`：OpenAPI/Swagger 定义
+   - `graphql/`：GraphQL schema 定义
+
+#### 配置和部署
+
+1. **`configs/`**：配置文件模板或默认配置
+   - `server.yaml`：主控端配置
+   - `agent.yaml`：节点端配置
+   - `aggregator.yaml`：聚合服务器配置
+
+2. **`deployments/`**：IaaS、PaaS、系统和容器编排部署配置和模板
+   - `docker/`：Docker 相关配置
+   - `kubernetes/`：K8s 资源定义
+   - `terraform/`：基础设施即代码
+
+3. **`build/`**：打包和持续集成
+   - `ci/`：CI 配置
+   - `package/`：打包脚本
+   - `docker/`：Docker 构建文件
+
+#### 文档和测试
+
+1. **`docs/`**：设计和用户文档
+   - `architecture.md`：架构设计文档
+   - `api.md`：API 使用文档
+   - `deployment.md`：部署指南
+   - `development.md`：开发指南
+
+2. **`test/`**：额外的外部测试应用程序和测试数据
+   - `integration/`：集成测试
+   - `benchmark/`：性能测试
+   - `fixtures/`：测试数据
+
+3. **`examples/`**：应用程序或公共库的示例
+   - `basic/`：基础使用示例
+   - `advanced/`：高级功能示例
+   - `integration/`：集成示例
+
+#### 工具和脚本
+
+1. **`scripts/`**：各种构建、安装、分析等脚本
+   - `build.sh`：构建脚本
+   - `deploy.sh`：部署脚本
+   - `test.sh`：测试脚本
+
+2. **`tools/`**：项目工具和辅助脚本
+   - `lint/`：代码检查工具
+   - `mock/`：模拟生成器
+   - `proto/`：Protocol Buffers 工具
+
+3. **`.github/`**：GitHub 相关配置
+   - `workflows/`：GitHub Actions 工作流配置
+   - `ISSUE_TEMPLATE/`：Issue 模板
+
+### 目录组织原则
+
+1. **按功能组织**：
+   - 每个目录都有明确的职责
+   - 相关功能放在同一个包中
+
+2. **分层设计**：
+   - 清晰的分层架构
+   - 避免循环依赖
+
+3. **可扩展性**：
+   - 结构设计合理，便于添加新功能
+   - 支持未来扩展
+
+4. **符合 Go 社区规范**：
+   - 遵循 Go 项目的最佳实践
+   - 便于其他 Go 开发者理解
+
+### 最佳实践建议
+
+1. **包设计**：
+   - 保持包的粒度适中，避免过大或过小
+   - 每个包应该有明确的职责
+   - 避免循环依赖
+
+2. **代码组织**：
+   - 相关的功能放在同一个包中
+   - 使用 `internal` 目录保护私有代码
+   - 公共代码放在 `pkg` 目录中
+
+3. **测试组织**：
+   - 单元测试与源代码放在同一个包中
+   - 集成测试放在 `test` 目录中
+   - 使用表驱动测试测试多种情况
+
+4. **文档组织**：
+   - 每个包都应该有一个 README.md 文件
+   - API 文档放在 `docs` 目录中
+   - 使用 godoc 格式的注释
+
+5. **构建与部署**：
+   - 使用 Makefile 简化构建过程
+   - 提供 Docker 和 Kubernetes 部署配置
+   - 使用 CI/CD 自动化构建和部署
 
 ## 错误处理
 
