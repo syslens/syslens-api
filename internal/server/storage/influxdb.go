@@ -197,7 +197,7 @@ func (s *InfluxDBStorage) StoreMetrics(nodeID string, metrics interface{}) error
 	s.writeAPI.Flush()
 
 	// 记录详细的写入信息
-	metricsTypes := []string{}
+	var metricsTypes []string
 	pointCounts := make(map[string]int)
 
 	if metricsMap["cpu"] != nil {
