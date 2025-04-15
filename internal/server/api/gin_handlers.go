@@ -1,12 +1,16 @@
 package api
 
 import (
+	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/syslens/syslens-api/internal/common/utils"
+	"github.com/syslens/syslens-api/internal/server/repository"
 	"go.uber.org/zap"
 )
 
@@ -116,11 +120,23 @@ func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 //	@Failure		500		{object}	Response			"服务器错误"
 //	@Router			/api/v1/nodes/register [post]
 func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
+	// 检查是否配置了节点仓库
+	if h.nodeRepo == nil {
+		h.logger.Error("节点仓库未配置")
+		RespondWithError(c, http.StatusInternalServerError, nil, "系统配置错误，节点仓库未初始化")
+		return
+	}
+
 	// 获取请求体
 	var registerRequest struct {
-		NodeID string `json:"node_id"`
-		Name   string `json:"name"`
-		// 其他节点信息字段
+		NodeID      string         `json:"node_id"`
+		Name        string         `json:"name" binding:"required"`
+		Labels      map[string]any `json:"labels"`
+		Type        string         `json:"type"`
+		GroupID     string         `json:"group_id"`
+		ServiceID   string         `json:"service_id"`
+		Description string         `json:"description"`
+		AuthToken   string         `json:"auth_token"`
 	}
 
 	if err := c.ShouldBindJSON(&registerRequest); err != nil {
@@ -138,15 +154,260 @@ func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 		zap.String("client_ip", c.ClientIP()),
 		zap.String("user_agent", c.Request.UserAgent()))
 
-	// 处理注册逻辑
-	// TODO: 实现实际的节点注册逻辑
+	// 实现节点注册逻辑
+	// 1. 检查节点是否已存在
+	var node *repository.Node
+	var err error
+
+	ctx := c.Request.Context()
+	if registerRequest.NodeID != "" {
+		// 如果提供了节点ID，检查是否已存在
+		node, err = h.nodeRepo.GetByID(ctx, registerRequest.NodeID)
+		if err != nil {
+			h.logger.Error("查询节点失败",
+				zap.String("node_id", registerRequest.NodeID),
+				zap.Error(err))
+			RespondWithError(c, http.StatusInternalServerError, err, "查询节点信息失败")
+			return
+		}
+	}
+
+	// 2. 如果节点不存在，创建新节点
+	if node == nil {
+		// 生成节点ID（如果未提供）
+		nodeID := registerRequest.NodeID
+		if nodeID == "" {
+			// 生成一个唯一ID，这里使用时间戳+随机字符组合
+			nodeID = fmt.Sprintf("node-%d-%s", time.Now().Unix(),
+				utils.GenerateRandomString(8))
+		}
+
+		// 生成认证令牌（如果未提供）
+		authToken := registerRequest.AuthToken
+		if authToken == "" {
+			authToken = utils.GenerateRandomString(32)
+		}
+
+		// 计算令牌的哈希值（存储哈希而不是原始令牌）
+		authTokenHash, err := utils.HashPassword(authToken)
+		if err != nil {
+			h.logger.Error("生成令牌哈希失败", zap.Error(err))
+			RespondWithError(c, http.StatusInternalServerError, err, "生成安全凭证失败")
+			return
+		}
+
+		// 使用系统主密钥加密令牌
+		systemKey := h.securityConfig.Encryption.Key
+		if systemKey == "" {
+			h.logger.Warn("系统主密钥未设置，使用默认密钥")
+			systemKey = "syslens-default-encryption-key-2023" // 默认密钥，建议在配置中设置更强的密钥
+		}
+
+		// 加密服务初始化
+		encryptSvc := utils.NewEncryptionService("aes-256-gcm")
+		encryptedTokenBytes, err := encryptSvc.Encrypt([]byte(authToken), systemKey)
+		if err != nil {
+			h.logger.Error("加密令牌失败", zap.Error(err))
+			RespondWithError(c, http.StatusInternalServerError, err, "加密令牌失败")
+			return
+		}
+		encryptedToken := base64.StdEncoding.EncodeToString(encryptedTokenBytes)
+
+		// 确定节点类型
+		nodeType := repository.NodeTypeAgent
+		if registerRequest.Type == string(repository.NodeTypeFixedService) {
+			nodeType = repository.NodeTypeFixedService
+		}
+
+		// 创建新节点实体
+		now := time.Now()
+		node = &repository.Node{
+			ID:                 nodeID,
+			Name:               registerRequest.Name,
+			AuthTokenHash:      authTokenHash,
+			EncryptedAuthToken: encryptedToken,
+			Labels:             registerRequest.Labels,
+			Type:               nodeType,
+			Status:             repository.NodeStatusPending, // 初始状态为待处理
+			RegisteredAt:       sql.NullTime{Time: now, Valid: true},
+			LastActiveAt:       sql.NullTime{Time: now, Valid: true},
+		}
+
+		// 设置可选字段
+		if registerRequest.GroupID != "" {
+			node.GroupID = sql.NullString{String: registerRequest.GroupID, Valid: true}
+		}
+		if registerRequest.ServiceID != "" {
+			node.ServiceID = sql.NullString{String: registerRequest.ServiceID, Valid: true}
+		}
+		if registerRequest.Description != "" {
+			node.Description = sql.NullString{String: registerRequest.Description, Valid: true}
+		}
+
+		// 保存节点到数据库
+		if err := h.nodeRepo.Create(ctx, node); err != nil {
+			h.logger.Error("创建节点失败",
+				zap.String("name", node.Name),
+				zap.Error(err))
+			RespondWithError(c, http.StatusInternalServerError, err, "创建节点失败")
+			return
+		}
+
+		// 记录成功信息
+		h.logger.Info("节点注册成功",
+			zap.String("node_id", node.ID),
+			zap.String("name", node.Name))
+
+		// 返回节点信息和认证令牌
+		RespondWithSuccess(c, http.StatusOK, gin.H{
+			"message":    "节点注册成功",
+			"node_id":    node.ID,
+			"auth_token": authToken, // 仅在初始注册时返回明文令牌
+		})
+		return
+	}
+
+	// 3. 如果节点已存在，更新节点信息
+	// 更新基本信息
+	node.Name = registerRequest.Name
+	if registerRequest.Labels != nil {
+		node.Labels = registerRequest.Labels
+	}
+
+	// 更新可选字段
+	if registerRequest.GroupID != "" {
+		node.GroupID = sql.NullString{String: registerRequest.GroupID, Valid: true}
+	}
+	if registerRequest.ServiceID != "" {
+		node.ServiceID = sql.NullString{String: registerRequest.ServiceID, Valid: true}
+	}
+	if registerRequest.Description != "" {
+		node.Description = sql.NullString{String: registerRequest.Description, Valid: true}
+	}
+
+	// 如果节点状态是非活动，将其设为等待中
+	if node.Status == repository.NodeStatusInactive {
+		node.Status = repository.NodeStatusPending
+	}
+
+	// 更新最后活动时间
+	now := time.Now()
+	node.LastActiveAt = sql.NullTime{Time: now, Valid: true}
+
+	// 保存更新到数据库
+	if err := h.nodeRepo.Update(ctx, node); err != nil {
+		h.logger.Error("更新节点失败",
+			zap.String("node_id", node.ID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "更新节点信息失败")
+		return
+	}
 
 	// 记录成功信息
-	h.logger.Info("节点注册成功",
-		zap.String("node_id", registerRequest.NodeID),
-		zap.String("name", registerRequest.Name))
+	h.logger.Info("节点信息更新成功",
+		zap.String("node_id", node.ID),
+		zap.String("name", node.Name))
 
-	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "节点注册成功"})
+	// 返回更新结果
+	RespondWithSuccess(c, http.StatusOK, gin.H{
+		"message": "节点信息更新成功",
+		"node_id": node.ID,
+	})
+}
+
+// HandleRetrieveNodeToken godoc
+//
+//	@Summary		恢复节点令牌
+//	@Description	根据节点ID恢复节点的认证令牌
+//	@Tags			节点管理
+//	@Accept			json
+//	@Produce		json
+//	@Param			node_id	path		string	true	"节点ID"
+//	@Success		200		{object}	Response{data=object{node_id=string,auth_token=string}}	"成功"
+//	@Failure		404		{object}	Response			"节点不存在"
+//	@Failure		500		{object}	Response			"服务器错误"
+//	@Router			/api/v1/nodes/{node_id}/token [get]
+func (h *MetricsHandler) HandleRetrieveNodeTokenGin(c *gin.Context) {
+	// 获取节点ID
+	nodeID := c.Param("node_id")
+	if nodeID == "" {
+		RespondWithError(c, http.StatusBadRequest, nil, "缺少节点ID")
+		return
+	}
+
+	// 检查是否配置了节点仓库
+	if h.nodeRepo == nil {
+		h.logger.Error("节点仓库未配置")
+		RespondWithError(c, http.StatusInternalServerError, nil, "系统配置错误，节点仓库未初始化")
+		return
+	}
+
+	// 获取节点信息
+	ctx := c.Request.Context()
+	node, err := h.nodeRepo.GetByID(ctx, nodeID)
+	if err != nil {
+		h.logger.Error("获取节点信息失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "获取节点信息失败")
+		return
+	}
+
+	// 检查节点是否存在
+	if node == nil {
+		h.logger.Warn("节点不存在",
+			zap.String("node_id", nodeID))
+		RespondWithError(c, http.StatusNotFound, nil, "节点不存在")
+		return
+	}
+
+	// 检查是否有加密的令牌
+	if node.EncryptedAuthToken == "" {
+		h.logger.Warn("节点没有保存加密令牌",
+			zap.String("node_id", nodeID))
+		RespondWithError(c, http.StatusNotFound, nil, "节点没有保存令牌或令牌已丢失")
+		return
+	}
+
+	// 解密令牌
+	systemKey := h.securityConfig.Encryption.Key
+	if systemKey == "" {
+		systemKey = "syslens-default-encryption-key-2023" // 默认密钥，与加密时使用的相同
+	}
+
+	// 解码Base64
+	encryptedBytes, err := base64.StdEncoding.DecodeString(node.EncryptedAuthToken)
+	if err != nil {
+		h.logger.Error("解码加密令牌失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "解码加密令牌失败")
+		return
+	}
+
+	// 解密
+	encryptSvc := utils.NewEncryptionService("aes-256-gcm")
+	decryptedBytes, err := encryptSvc.Decrypt(encryptedBytes, systemKey)
+	if err != nil {
+		h.logger.Error("解密令牌失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "解密令牌失败")
+		return
+	}
+
+	// 记录操作日志(敏感操作)
+	h.logger.Info("节点令牌恢复请求成功",
+		zap.String("node_id", nodeID),
+		zap.String("client_ip", c.ClientIP()),
+		zap.String("user_agent", c.Request.UserAgent()))
+
+	// 返回令牌
+	RespondWithSuccess(c, http.StatusOK, gin.H{
+		"node_id":    nodeID,
+		"auth_token": string(decryptedBytes),
+		"message":    "节点令牌恢复成功",
+	})
 }
 
 // HandleMetricsSubmitGin godoc
