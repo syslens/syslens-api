@@ -28,8 +28,8 @@ type User struct {
 	PasswordHash string    `json:"-"` // 不在JSON中暴露
 	Role         UserRole  `json:"role"`
 	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	CreatedAt    time.Time `json:"created_time"`
+	UpdatedAt    time.Time `json:"updated_time"`
 }
 
 // UserSession 表示用户会话实体
@@ -37,7 +37,7 @@ type UserSession struct {
 	SessionID  string    `json:"session_id"`
 	UserID     uuid.UUID `json:"user_id"`
 	ExpiresAt  time.Time `json:"expires_at"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time `json:"created_time"`
 	LastUsedAt time.Time `json:"last_used_at"`
 }
 
@@ -102,7 +102,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *User) error {
 			id, username, email, password_hash, role, is_active
 		) VALUES (
 			$1, $2, $3, $4, $5, $6
-		) RETURNING created_at, updated_at
+		) RETURNING created_time, updated_time
 	`
 
 	// 如果ID为空，生成新的UUID
@@ -132,7 +132,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *User) error {
 func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `
 		SELECT 
-			id, username, email, password_hash, role, is_active, created_at, updated_at
+			id, username, email, password_hash, role, is_active, created_time, updated_time
 		FROM users
 		WHERE id = $1
 	`
@@ -163,7 +163,7 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*Us
 func (r *PostgresUserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	query := `
 		SELECT 
-			id, username, email, password_hash, role, is_active, created_at, updated_at
+			id, username, email, password_hash, role, is_active, created_time, updated_time
 		FROM users
 		WHERE username = $1
 	`
@@ -194,7 +194,7 @@ func (r *PostgresUserRepository) GetByUsername(ctx context.Context, username str
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
 		SELECT 
-			id, username, email, password_hash, role, is_active, created_at, updated_at
+			id, username, email, password_hash, role, is_active, created_time, updated_time
 		FROM users
 		WHERE email = $1
 	`
@@ -225,7 +225,7 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 func (r *PostgresUserRepository) GetAll(ctx context.Context) ([]*User, error) {
 	query := `
 		SELECT 
-			id, username, email, password_hash, role, is_active, created_at, updated_at
+			id, username, email, password_hash, role, is_active, created_time, updated_time
 		FROM users
 		ORDER BY username
 	`
@@ -249,7 +249,7 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *User) error {
 			role = $4,
 			is_active = $5
 		WHERE id = $1
-		RETURNING updated_at
+		RETURNING updated_time
 	`
 
 	err := r.db.QueryRowContext(
@@ -344,7 +344,7 @@ func (r *PostgresUserRepository) CreateSession(ctx context.Context, session *Use
 			session_id, user_id, expires_at
 		) VALUES (
 			$1, $2, $3
-		) RETURNING created_at, last_used_at
+		) RETURNING created_time, last_used_at
 	`
 
 	err := r.db.QueryRowContext(
@@ -366,7 +366,7 @@ func (r *PostgresUserRepository) CreateSession(ctx context.Context, session *Use
 func (r *PostgresUserRepository) GetSession(ctx context.Context, sessionID string) (*UserSession, error) {
 	query := `
 		SELECT 
-			session_id, user_id, expires_at, created_at, last_used_at
+			session_id, user_id, expires_at, created_time, last_used_at
 		FROM user_sessions
 		WHERE session_id = $1
 	`

@@ -41,8 +41,8 @@ type Node struct {
 	Description   sql.NullString `json:"description,omitempty"`
 	RegisteredAt  sql.NullTime   `json:"registered_at,omitempty"`
 	LastActiveAt  sql.NullTime   `json:"last_active_at,omitempty"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	CreatedAt     time.Time      `json:"created_time"`
+	UpdatedAt     time.Time      `json:"updated_time"`
 }
 
 // NodeRepository 定义节点仓库接口
@@ -107,7 +107,7 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 			group_id, service_id, description, registered_at, last_active_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-		) RETURNING created_at, updated_at
+		) RETURNING created_time, updated_time
 	`
 
 	// 执行插入
@@ -140,7 +140,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 		SELECT 
 			id, name, auth_token_hash, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
-			created_at, updated_at
+			created_time, updated_time
 		FROM nodes
 		WHERE id = $1
 	`
@@ -185,7 +185,7 @@ func (r *PostgresNodeRepository) GetAll(ctx context.Context) ([]*Node, error) {
 		SELECT 
 			id, name, auth_token_hash, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
-			created_at, updated_at
+			created_time, updated_time
 		FROM nodes
 		ORDER BY name
 	`
@@ -205,7 +205,7 @@ func (r *PostgresNodeRepository) GetByStatus(ctx context.Context, status NodeSta
 		SELECT 
 			id, name, auth_token_hash, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
-			created_at, updated_at
+			created_time, updated_time
 		FROM nodes
 		WHERE status = $1
 		ORDER BY name
@@ -226,7 +226,7 @@ func (r *PostgresNodeRepository) GetByGroupID(ctx context.Context, groupID strin
 		SELECT 
 			id, name, auth_token_hash, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
-			created_at, updated_at
+			created_time, updated_time
 		FROM nodes
 		WHERE group_id = $1
 		ORDER BY name
@@ -247,7 +247,7 @@ func (r *PostgresNodeRepository) GetByServiceID(ctx context.Context, serviceID s
 		SELECT 
 			id, name, auth_token_hash, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
-			created_at, updated_at
+			created_time, updated_time
 		FROM nodes
 		WHERE service_id = $1
 		ORDER BY name
@@ -284,7 +284,7 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 			registered_at = $10,
 			last_active_at = $11
 		WHERE id = $1
-		RETURNING updated_at
+		RETURNING updated_time
 	`
 
 	err = r.db.QueryRowContext(

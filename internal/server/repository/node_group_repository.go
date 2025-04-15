@@ -16,8 +16,8 @@ type NodeGroup struct {
 	Name        string         `json:"name"`
 	Type        sql.NullString `json:"type,omitempty"`
 	Description sql.NullString `json:"description,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	CreatedAt   time.Time      `json:"created_time"`
+	UpdatedAt   time.Time      `json:"updated_time"`
 }
 
 // NodeGroupRepository 定义节点分组仓库接口
@@ -63,7 +63,7 @@ func (r *PostgresNodeGroupRepository) Create(ctx context.Context, group *NodeGro
 			id, name, type, description
 		) VALUES (
 			$1, $2, $3, $4
-		) RETURNING created_at, updated_at
+		) RETURNING created_time, updated_time
 	`
 
 	err := r.db.QueryRowContext(
@@ -86,7 +86,7 @@ func (r *PostgresNodeGroupRepository) Create(ctx context.Context, group *NodeGro
 func (r *PostgresNodeGroupRepository) GetByID(ctx context.Context, id string) (*NodeGroup, error) {
 	query := `
 		SELECT 
-			id, name, type, description, created_at, updated_at
+			id, name, type, description, created_time, updated_time
 		FROM node_groups
 		WHERE id = $1
 	`
@@ -115,7 +115,7 @@ func (r *PostgresNodeGroupRepository) GetByID(ctx context.Context, id string) (*
 func (r *PostgresNodeGroupRepository) GetByName(ctx context.Context, name string) (*NodeGroup, error) {
 	query := `
 		SELECT 
-			id, name, type, description, created_at, updated_at
+			id, name, type, description, created_time, updated_time
 		FROM node_groups
 		WHERE name = $1
 	`
@@ -144,7 +144,7 @@ func (r *PostgresNodeGroupRepository) GetByName(ctx context.Context, name string
 func (r *PostgresNodeGroupRepository) GetAll(ctx context.Context) ([]*NodeGroup, error) {
 	query := `
 		SELECT 
-			id, name, type, description, created_at, updated_at
+			id, name, type, description, created_time, updated_time
 		FROM node_groups
 		ORDER BY name
 	`
@@ -162,7 +162,7 @@ func (r *PostgresNodeGroupRepository) GetAll(ctx context.Context) ([]*NodeGroup,
 func (r *PostgresNodeGroupRepository) GetByType(ctx context.Context, groupType string) ([]*NodeGroup, error) {
 	query := `
 		SELECT 
-			id, name, type, description, created_at, updated_at
+			id, name, type, description, created_time, updated_time
 		FROM node_groups
 		WHERE type = $1
 		ORDER BY name
@@ -186,7 +186,7 @@ func (r *PostgresNodeGroupRepository) Update(ctx context.Context, group *NodeGro
 			type = $3,
 			description = $4
 		WHERE id = $1
-		RETURNING updated_at
+		RETURNING updated_time
 	`
 
 	err := r.db.QueryRowContext(

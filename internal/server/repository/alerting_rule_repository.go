@@ -43,8 +43,8 @@ type AlertingRule struct {
 	Severity             AlertSeverity   `json:"severity"`
 	NotificationChannels []string        `json:"notification_channels"`
 	IsEnabled            bool            `json:"is_enabled"`
-	CreatedAt            time.Time       `json:"created_at"`
-	UpdatedAt            time.Time       `json:"updated_at"`
+	CreatedAt            time.Time       `json:"created_time"`
+	UpdatedAt            time.Time       `json:"updated_time"`
 }
 
 // AlertingRuleRepository 定义告警规则仓库接口
@@ -103,7 +103,7 @@ func (r *PostgresAlertingRuleRepository) Create(ctx context.Context, rule *Alert
 			metric_query, duration, severity, notification_channels, is_enabled
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-		) RETURNING created_at, updated_at
+		) RETURNING created_time, updated_time
 	`
 
 	// 如果ID为空，生成新的UUID
@@ -139,7 +139,7 @@ func (r *PostgresAlertingRuleRepository) GetByID(ctx context.Context, id uuid.UU
 		SELECT 
 			id, name, description, target_type, target_id, 
 			metric_query, duration, severity, notification_channels, is_enabled,
-			created_at, updated_at
+			created_time, updated_time
 		FROM alerting_rules
 		WHERE id = $1
 	`
@@ -183,7 +183,7 @@ func (r *PostgresAlertingRuleRepository) GetAll(ctx context.Context) ([]*Alertin
 		SELECT 
 			id, name, description, target_type, target_id, 
 			metric_query, duration, severity, notification_channels, is_enabled,
-			created_at, updated_at
+			created_time, updated_time
 		FROM alerting_rules
 		ORDER BY name
 	`
@@ -203,7 +203,7 @@ func (r *PostgresAlertingRuleRepository) GetByTarget(ctx context.Context, target
 		SELECT 
 			id, name, description, target_type, target_id, 
 			metric_query, duration, severity, notification_channels, is_enabled,
-			created_at, updated_at
+			created_time, updated_time
 		FROM alerting_rules
 		WHERE target_type = $1 AND (target_id = $2 OR (target_type = 'global' AND target_id IS NULL))
 		ORDER BY name
@@ -224,7 +224,7 @@ func (r *PostgresAlertingRuleRepository) GetBySeverity(ctx context.Context, seve
 		SELECT 
 			id, name, description, target_type, target_id, 
 			metric_query, duration, severity, notification_channels, is_enabled,
-			created_at, updated_at
+			created_time, updated_time
 		FROM alerting_rules
 		WHERE severity = $1
 		ORDER BY name
@@ -245,7 +245,7 @@ func (r *PostgresAlertingRuleRepository) GetEnabled(ctx context.Context) ([]*Ale
 		SELECT 
 			id, name, description, target_type, target_id, 
 			metric_query, duration, severity, notification_channels, is_enabled,
-			created_at, updated_at
+			created_time, updated_time
 		FROM alerting_rules
 		WHERE is_enabled = true
 		ORDER BY name
@@ -281,7 +281,7 @@ func (r *PostgresAlertingRuleRepository) Update(ctx context.Context, rule *Alert
 			notification_channels = $9,
 			is_enabled = $10
 		WHERE id = $1
-		RETURNING updated_at
+		RETURNING updated_time
 	`
 
 	err = r.db.QueryRowContext(

@@ -116,7 +116,36 @@ func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 //	@Failure		500		{object}	Response			"服务器错误"
 //	@Router			/nodes/register [post]
 func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
+	// 获取请求体
+	var registerRequest struct {
+		NodeID string `json:"node_id"`
+		Name   string `json:"name"`
+		// 其他节点信息字段
+	}
+
+	if err := c.ShouldBindJSON(&registerRequest); err != nil {
+		h.logger.Error("解析节点注册请求失败",
+			zap.Error(err),
+			zap.String("client_ip", c.ClientIP()))
+		RespondWithError(c, http.StatusBadRequest, err, "解析请求数据失败")
+		return
+	}
+
+	// 记录请求信息
+	h.logger.Info("接收到节点注册请求",
+		zap.String("node_id", registerRequest.NodeID),
+		zap.String("name", registerRequest.Name),
+		zap.String("client_ip", c.ClientIP()),
+		zap.String("user_agent", c.Request.UserAgent()))
+
 	// 处理注册逻辑
+	// TODO: 实现实际的节点注册逻辑
+
+	// 记录成功信息
+	h.logger.Info("节点注册成功",
+		zap.String("node_id", registerRequest.NodeID),
+		zap.String("name", registerRequest.Name))
+
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "节点注册成功"})
 }
 

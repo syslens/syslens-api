@@ -17,8 +17,8 @@ type Service struct {
 	Name            string         `json:"name"`
 	Description     sql.NullString `json:"description,omitempty"`
 	CriticalMetrics map[string]any `json:"critical_metrics,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	CreatedAt       time.Time      `json:"created_time"`
+	UpdatedAt       time.Time      `json:"updated_time"`
 }
 
 // ServiceRepository 定义服务仓库接口
@@ -67,7 +67,7 @@ func (r *PostgresServiceRepository) Create(ctx context.Context, service *Service
 			id, name, description, critical_metrics
 		) VALUES (
 			$1, $2, $3, $4
-		) RETURNING created_at, updated_at
+		) RETURNING created_time, updated_time
 	`
 
 	err = r.db.QueryRowContext(
@@ -90,7 +90,7 @@ func (r *PostgresServiceRepository) Create(ctx context.Context, service *Service
 func (r *PostgresServiceRepository) GetByID(ctx context.Context, id string) (*Service, error) {
 	query := `
 		SELECT 
-			id, name, description, critical_metrics, created_at, updated_at
+			id, name, description, critical_metrics, created_time, updated_time
 		FROM services
 		WHERE id = $1
 	`
@@ -128,7 +128,7 @@ func (r *PostgresServiceRepository) GetByID(ctx context.Context, id string) (*Se
 func (r *PostgresServiceRepository) GetByName(ctx context.Context, name string) (*Service, error) {
 	query := `
 		SELECT 
-			id, name, description, critical_metrics, created_at, updated_at
+			id, name, description, critical_metrics, created_time, updated_time
 		FROM services
 		WHERE name = $1
 	`
@@ -166,7 +166,7 @@ func (r *PostgresServiceRepository) GetByName(ctx context.Context, name string) 
 func (r *PostgresServiceRepository) GetAll(ctx context.Context) ([]*Service, error) {
 	query := `
 		SELECT 
-			id, name, description, critical_metrics, created_at, updated_at
+			id, name, description, critical_metrics, created_time, updated_time
 		FROM services
 		ORDER BY name
 	`
@@ -195,7 +195,7 @@ func (r *PostgresServiceRepository) Update(ctx context.Context, service *Service
 			description = $3,
 			critical_metrics = $4
 		WHERE id = $1
-		RETURNING updated_at
+		RETURNING updated_time
 	`
 
 	err = r.db.QueryRowContext(

@@ -19,8 +19,11 @@ const (
 		password_hash VARCHAR(255) NOT NULL,
 		role VARCHAR(50) NOT NULL,
 		is_active BOOLEAN NOT NULL DEFAULT TRUE,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -29,8 +32,12 @@ const (
 		session_id VARCHAR(255) PRIMARY KEY,
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		last_used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		last_used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -40,8 +47,11 @@ const (
 		name VARCHAR(255) NOT NULL UNIQUE,
 		description TEXT,
 		type VARCHAR(50),
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -60,7 +70,11 @@ const (
 		labels JSONB,
 		last_active_at TIMESTAMP WITH TIME ZONE,
 		registered_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -71,8 +85,11 @@ const (
 		description TEXT,
 		type VARCHAR(50),
 		critical_metrics JSONB,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -81,7 +98,11 @@ const (
 		service_id VARCHAR(255) NOT NULL REFERENCES services(id) ON DELETE CASCADE,
 		node_id VARCHAR(255) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
 		priority INT NOT NULL DEFAULT 0,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE,
 		PRIMARY KEY (service_id, node_id)
 	);
 	`
@@ -98,8 +119,11 @@ const (
 		severity VARCHAR(50) NOT NULL,
 		notification_channels JSONB,
 		is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
@@ -113,8 +137,11 @@ const (
 		status VARCHAR(50) NOT NULL,
 		severity VARCHAR(50) NOT NULL,
 		details JSONB,
-		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 )
@@ -219,35 +246,35 @@ func (p *PostgresDB) VerifyTableColumns(ctx context.Context) error {
 	requiredColumns := []tableColumns{
 		{
 			tableName: "users",
-			columns:   []string{"id", "username", "email", "password_hash", "role", "is_active", "created_at", "updated_at"},
+			columns:   []string{"id", "username", "email", "password_hash", "role", "is_active", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "user_sessions",
-			columns:   []string{"session_id", "user_id", "expires_at", "created_at", "last_used_at"},
+			columns:   []string{"session_id", "user_id", "expires_at", "created_time", "updated_time", "last_used_at", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "node_groups",
-			columns:   []string{"id", "name", "description", "type", "created_at", "updated_at"},
+			columns:   []string{"id", "name", "description", "type", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "nodes",
-			columns:   []string{"id", "name", "auth_token_hash", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "updated_at"},
+			columns:   []string{"id", "name", "auth_token_hash", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "services",
-			columns:   []string{"id", "name", "description", "type", "critical_metrics", "created_at", "updated_at"},
+			columns:   []string{"id", "name", "description", "type", "critical_metrics", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "service_nodes",
-			columns:   []string{"service_id", "node_id", "priority", "created_at"},
+			columns:   []string{"service_id", "node_id", "priority", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "alerting_rules",
-			columns:   []string{"id", "name", "description", "target_type", "target_id", "metric_query", "duration", "severity", "notification_channels", "is_enabled", "created_at", "updated_at"},
+			columns:   []string{"id", "name", "description", "target_type", "target_id", "metric_query", "duration", "severity", "notification_channels", "is_enabled", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "notifications",
-			columns:   []string{"id", "alert_rule_id", "node_id", "triggered_at", "resolved_at", "status", "severity", "details", "created_at", "updated_at"},
+			columns:   []string{"id", "alert_rule_id", "node_id", "triggered_at", "resolved_at", "status", "severity", "details", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 	}
 
@@ -297,7 +324,12 @@ func (p *PostgresDB) createMigrationTable(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS schema_migrations (
 		migration_name VARCHAR(255) PRIMARY KEY,
-		applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		updated_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+		created_user VARCHAR(255),
+		updated_user VARCHAR(255),
+		deleted BOOLEAN NOT NULL DEFAULT FALSE
 	);
 	`
 
