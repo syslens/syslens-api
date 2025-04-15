@@ -60,6 +60,7 @@ const (
 		id VARCHAR(255) PRIMARY KEY,
 		name VARCHAR(255) NOT NULL,
 		auth_token_hash VARCHAR(255) NOT NULL,
+		encrypted_auth_token TEXT,
 		hostname VARCHAR(255),
 		ip_address VARCHAR(50),
 		type VARCHAR(50) NOT NULL,
@@ -258,7 +259,7 @@ func (p *PostgresDB) VerifyTableColumns(ctx context.Context) error {
 		},
 		{
 			tableName: "nodes",
-			columns:   []string{"id", "name", "auth_token_hash", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
+			columns:   []string{"id", "name", "auth_token_hash", "encrypted_auth_token", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "services",
