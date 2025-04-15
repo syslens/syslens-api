@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/syslens/syslens-api/internal/common/utils"
 	"github.com/syslens/syslens-api/internal/server/storage"
 )
 
@@ -35,6 +36,7 @@ type Node struct {
 	AuthTokenHash      string         `json:"-"` // 不在JSON中暴露
 	EncryptedAuthToken string         `json:"-"` // 加密存储的原始令牌，不在JSON中暴露
 	Labels             map[string]any `json:"labels"`
+	Configuration      map[string]any `json:"configuration,omitempty"`
 	Type               NodeType       `json:"type"`
 	Status             NodeStatus     `json:"status"`
 	GroupID            sql.NullString `json:"group_id,omitempty"`
@@ -80,6 +82,12 @@ type NodeRepository interface {
 
 	// ValidateNodeToken 验证节点令牌
 	ValidateNodeToken(ctx context.Context, id string, token string) (bool, error)
+
+	// UpdateConfiguration 更新节点配置
+	UpdateConfiguration(ctx context.Context, id string, configuration map[string]any) error
+
+	// FindByToken 通过令牌查找节点
+	FindByToken(ctx context.Context, token string) (*Node, error)
 }
 
 // PostgresNodeRepository 实现基于PostgreSQL的节点仓库
@@ -102,12 +110,24 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 		return fmt.Errorf("序列化节点标签失败: %w", err)
 	}
 
+	// 将configuration转换为JSONB
+	var configJSON []byte
+	if node.Configuration != nil {
+		configJSON, err = json.Marshal(node.Configuration)
+		if err != nil {
+			return fmt.Errorf("序列化节点配置失败: %w", err)
+		}
+	} else {
+		// 确保配置为空时使用有效的空JSON对象，而不是null
+		configJSON = []byte("{}")
+	}
+
 	query := `
 		INSERT INTO nodes (
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 		) RETURNING created_time, updated_time
 	`
 
@@ -120,6 +140,7 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 		node.AuthTokenHash,
 		node.EncryptedAuthToken,
 		labelsJSON,
+		configJSON,
 		node.Type,
 		node.Status,
 		node.GroupID,
@@ -140,7 +161,7 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -149,6 +170,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 
 	var node Node
 	var labelsJSON []byte
+	var configJSON []byte
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&node.ID,
@@ -156,6 +178,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 		&node.AuthTokenHash,
 		&node.EncryptedAuthToken,
 		&labelsJSON,
+		&configJSON,
 		&node.Type,
 		&node.Status,
 		&node.GroupID,
@@ -179,6 +202,13 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 		return nil, fmt.Errorf("解析节点标签失败: %w", err)
 	}
 
+	// 解析配置JSON
+	if len(configJSON) > 0 {
+		if err := json.Unmarshal(configJSON, &node.Configuration); err != nil {
+			return nil, fmt.Errorf("解析节点配置失败: %w", err)
+		}
+	}
+
 	return &node, nil
 }
 
@@ -186,7 +216,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 func (r *PostgresNodeRepository) GetAll(ctx context.Context) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -206,7 +236,7 @@ func (r *PostgresNodeRepository) GetAll(ctx context.Context) ([]*Node, error) {
 func (r *PostgresNodeRepository) GetByStatus(ctx context.Context, status NodeStatus) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -227,7 +257,7 @@ func (r *PostgresNodeRepository) GetByStatus(ctx context.Context, status NodeSta
 func (r *PostgresNodeRepository) GetByGroupID(ctx context.Context, groupID string) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -248,7 +278,7 @@ func (r *PostgresNodeRepository) GetByGroupID(ctx context.Context, groupID strin
 func (r *PostgresNodeRepository) GetByServiceID(ctx context.Context, serviceID string) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, configuration, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -273,6 +303,18 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 		return fmt.Errorf("序列化节点标签失败: %w", err)
 	}
 
+	// 将configuration转换为JSONB
+	var configJSON []byte
+	if node.Configuration != nil {
+		configJSON, err = json.Marshal(node.Configuration)
+		if err != nil {
+			return fmt.Errorf("序列化节点配置失败: %w", err)
+		}
+	} else {
+		// 确保配置为空时使用有效的空JSON对象，而不是null
+		configJSON = []byte("{}")
+	}
+
 	query := `
 		UPDATE nodes
 		SET 
@@ -280,13 +322,14 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 			auth_token_hash = $3,
 			encrypted_auth_token = $4,
 			labels = $5,
-			type = $6,
-			status = $7,
-			group_id = $8,
-			service_id = $9,
-			description = $10,
-			registered_at = $11,
-			last_active_at = $12
+			configuration = $6,
+			type = $7,
+			status = $8,
+			group_id = $9,
+			service_id = $10,
+			description = $11,
+			registered_at = $12,
+			last_active_at = $13
 		WHERE id = $1
 		RETURNING updated_time
 	`
@@ -299,6 +342,7 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 		node.AuthTokenHash,
 		node.EncryptedAuthToken,
 		labelsJSON,
+		configJSON,
 		node.Type,
 		node.Status,
 		node.GroupID,
@@ -406,10 +450,9 @@ func (r *PostgresNodeRepository) ValidateNodeToken(ctx context.Context, id strin
 		return false, fmt.Errorf("获取节点令牌失败: %w", err)
 	}
 
-	// 在实际应用中，应该使用安全的哈希比较函数
-	// 这里简化处理，直接比较哈希值
-	// TODO: 使用安全的哈希比较函数
-	return storedTokenHash == token, nil
+	// 使用ComparePasswordAndHash函数验证token是否匹配
+	isValid := utils.ComparePasswordAndHash(token, storedTokenHash)
+	return isValid, nil
 }
 
 // scanNodes 扫描查询结果并返回节点列表
@@ -419,6 +462,7 @@ func (r *PostgresNodeRepository) scanNodes(rows *sql.Rows) ([]*Node, error) {
 	for rows.Next() {
 		var node Node
 		var labelsJSON []byte
+		var configJSON []byte
 
 		err := rows.Scan(
 			&node.ID,
@@ -426,6 +470,7 @@ func (r *PostgresNodeRepository) scanNodes(rows *sql.Rows) ([]*Node, error) {
 			&node.AuthTokenHash,
 			&node.EncryptedAuthToken,
 			&labelsJSON,
+			&configJSON,
 			&node.Type,
 			&node.Status,
 			&node.GroupID,
@@ -446,6 +491,13 @@ func (r *PostgresNodeRepository) scanNodes(rows *sql.Rows) ([]*Node, error) {
 			return nil, fmt.Errorf("解析节点标签失败: %w", err)
 		}
 
+		// 解析配置JSON
+		if len(configJSON) > 0 {
+			if err := json.Unmarshal(configJSON, &node.Configuration); err != nil {
+				return nil, fmt.Errorf("解析节点配置失败: %w", err)
+			}
+		}
+
 		nodes = append(nodes, &node)
 	}
 
@@ -454,4 +506,64 @@ func (r *PostgresNodeRepository) scanNodes(rows *sql.Rows) ([]*Node, error) {
 	}
 
 	return nodes, nil
+}
+
+// UpdateConfiguration 更新节点配置
+func (r *PostgresNodeRepository) UpdateConfiguration(ctx context.Context, id string, configuration map[string]any) error {
+	// 将configuration转换为JSONB
+	var configJSON []byte
+	var err error
+
+	if configuration != nil {
+		configJSON, err = json.Marshal(configuration)
+		if err != nil {
+			return fmt.Errorf("序列化节点配置失败: %w", err)
+		}
+	} else {
+		// 确保配置为空时使用有效的空JSON对象，而不是null
+		configJSON = []byte("{}")
+	}
+
+	query := `
+		UPDATE nodes
+		SET configuration = $2
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id, configJSON)
+	if err != nil {
+		return fmt.Errorf("更新节点配置失败: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("获取受影响行数失败: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("节点 %s 不存在", id)
+	}
+
+	return nil
+}
+
+// FindByToken 通过令牌查找节点
+func (r *PostgresNodeRepository) FindByToken(ctx context.Context, token string) (*Node, error) {
+	// 由于token是哈希存储的，无法直接通过token查询
+	// 需要获取所有节点，然后逐个验证token
+	nodes, err := r.GetAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("获取所有节点失败: %w", err)
+	}
+
+	for _, node := range nodes {
+		// 验证token
+		// 使用ComparePasswordAndHash函数验证token是否匹配
+		isValid := utils.ComparePasswordAndHash(token, node.AuthTokenHash)
+		if isValid {
+			return node, nil // 找到匹配的节点
+		}
+	}
+
+	return nil, nil // 未找到匹配的节点
 }
