@@ -1,4 +1,4 @@
-.PHONY: build-server build-agent build-aggregator build-all test clean deps run-server run-agent run-aggregator docs fmt lint help migrate-up migrate-down migrate-create migrate-goto migrate-force migrate-version migrate-drop
+.PHONY: build-server build-agent build-aggregator build-all test clean deps run-server run-agent run-aggregator docs swagger-server fmt lint help migrate-up migrate-down migrate-create migrate-goto migrate-force migrate-version migrate-drop
 
 # 变量定义
 BINARY_DIR=bin
@@ -56,6 +56,14 @@ run-aggregator:
 docs:
 	@echo "生成文档..."
 	@pandoc -f markdown -t docx -o PRODUCT.docx PRODUCT.md
+
+# 生成主控端 Swagger API 文档
+swagger-server:
+	@echo "生成主控端 Swagger API 文档..."
+	swag init -g cmd/server/main.go --parseDependency --parseInternal
+	swag fmt
+	cp docs/swagger.json docs/doc.json
+	@echo "主控端 Swagger API 文档生成完成，访问 http://localhost:8080/swagger/index.html 查看"
 
 # 格式化代码
 fmt:
@@ -175,5 +183,6 @@ help:
 	@echo "  make run-agent         - 运行节点端(开发环境)"
 	@echo "  make run-aggregator    - 运行聚合服务器(开发环境)"
 	@echo "  make docs              - 生成文档"
+	@echo "  make swagger-server    - 生成主控端 Swagger API 文档"
 	@echo "  make fmt               - 格式化代码"
 	@echo "  make lint              - 检查代码"
