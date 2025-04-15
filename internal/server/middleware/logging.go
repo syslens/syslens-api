@@ -19,7 +19,7 @@ func Logging(logger *zap.Logger) gin.HandlerFunc {
 		c.Set("logger", logger)
 
 		// 记录请求开始
-		logger.Debug("收到HTTP请求",
+		logger.Info("收到HTTP请求",
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
 			zap.String("query", query),
@@ -40,7 +40,7 @@ func Logging(logger *zap.Logger) gin.HandlerFunc {
 		}
 
 		// 记录请求完成
-		logger.Debug("HTTP请求完成",
+		logger.Info("HTTP请求完成",
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
 			zap.String("query", query),
