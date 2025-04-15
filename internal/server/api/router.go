@@ -66,6 +66,9 @@ func setupNodeRoutes(rg *gin.RouterGroup, handler *MetricsHandler) {
 		// 更新节点状态
 		nodes.PUT("/status", handler.HandleUpdateNodeStatusGin)
 
+		// 获取节点配置（只需token）
+		nodes.GET("/configuration", handler.HandleGetNodeConfigurationGin)
+
 		// 特定节点的操作
 		nodeGroup := nodes.Group("/:node_id")
 		{
@@ -74,6 +77,9 @@ func setupNodeRoutes(rg *gin.RouterGroup, handler *MetricsHandler) {
 
 			// 获取节点令牌
 			nodeGroup.GET("/token", handler.HandleGetNodeTokenGin)
+
+			// 更新节点配置
+			nodeGroup.PUT("/configuration", handler.HandleUpdateNodeConfigurationGin)
 		}
 	}
 
