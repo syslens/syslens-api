@@ -684,6 +684,45 @@ paths:
       summary: 上报节点指标
       tags:
       - metrics
+  /api/v1/nodes/{node_id}/token:
+    get:
+      consumes:
+      - application/json
+      description: 根据节点ID恢复节点的认证令牌
+      parameters:
+      - description: 节点ID
+        in: path
+        name: node_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_server_api.Response'
+            - properties:
+                data:
+                  properties:
+                    auth_token:
+                      type: string
+                    node_id:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: 节点不存在
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 获取节点令牌
+      tags:
+      - nodes
   /api/v1/nodes/metrics:
     get:
       consumes:
@@ -762,7 +801,7 @@ paths:
             $ref: '#/definitions/internal_server_api.Response'
       summary: 注册节点
       tags:
-      - 节点管理
+      - nodes
   /api/v1/nodes/status:
     put:
       consumes:
@@ -792,7 +831,7 @@ paths:
             $ref: '#/definitions/internal_server_api.Response'
       summary: 更新节点状态
       tags:
-      - 节点管理
+      - nodes
   /api/v1/notifications:
     get:
       consumes:

@@ -864,7 +864,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "节点管理"
+                    "nodes"
                 ],
                 "summary": "注册节点",
                 "parameters": [
@@ -922,7 +922,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "节点管理"
+                    "nodes"
                 ],
                 "summary": "更新节点状态",
                 "parameters": [
@@ -1057,6 +1057,70 @@ const docTemplate = `{
                                     "type": "boolean"
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/{node_id}/token": {
+            "get": {
+                "description": "根据节点ID恢复节点的认证令牌",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "nodes"
+                ],
+                "summary": "获取节点令牌",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "节点ID",
+                        "name": "node_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/internal_server_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "auth_token": {
+                                                    "type": "string"
+                                                },
+                                                "node_id": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "节点不存在",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
                         }
                     }
                 }
