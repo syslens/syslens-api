@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -10,9 +11,11 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/syslens/syslens-api/internal/config"
 	"github.com/syslens/syslens-api/internal/server/api"
+	"github.com/syslens/syslens-api/internal/server/repository"
 	"github.com/syslens/syslens-api/internal/server/storage"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -65,7 +68,123 @@ func main() {
 
 	// 初始化存储
 	var metricsStorage api.MetricsStorage
+	var postgresDB *storage.PostgresDB
 
+	// 初始化PostgreSQL数据库（用于管理数据）
+	log.Println("初始化PostgreSQL数据库连接...")
+
+	// 设置PostgreSQL默认配置，确保即使未配置也能正常工作
+	pgConfig := storage.PostgresConfig{
+		Host:         serverConfig.Storage.Postgres.Host,
+		Port:         serverConfig.Storage.Postgres.Port,
+		User:         serverConfig.Storage.Postgres.User,
+		Password:     serverConfig.Storage.Postgres.Password,
+		DBName:       serverConfig.Storage.Postgres.DBName,
+		SSLMode:      serverConfig.Storage.Postgres.SSLMode,
+		MaxOpenConns: serverConfig.Storage.Postgres.MaxOpenConns,
+		MaxIdleConns: serverConfig.Storage.Postgres.MaxIdleConns,
+		AutoMigrate:  serverConfig.Storage.Postgres.AutoMigrate,
+	}
+
+	// 使用默认值（如果未配置）
+	if pgConfig.Host == "" {
+		pgConfig.Host = "localhost"
+	}
+	if pgConfig.Port == 0 {
+		pgConfig.Port = 5432
+	}
+	if pgConfig.User == "" {
+		pgConfig.User = "postgres"
+	}
+	if pgConfig.DBName == "" {
+		pgConfig.DBName = "syslens"
+	}
+	if pgConfig.SSLMode == "" {
+		pgConfig.SSLMode = "disable"
+	}
+	if pgConfig.MaxOpenConns == 0 {
+		pgConfig.MaxOpenConns = 10
+	}
+	if pgConfig.MaxIdleConns == 0 {
+		pgConfig.MaxIdleConns = 5
+	}
+
+	// 设置连接最大生命周期
+	if serverConfig.Storage.Postgres.ConnMaxLife > 0 {
+		// 使用整数秒配置
+		pgConfig.ConnMaxLife = time.Duration(serverConfig.Storage.Postgres.ConnMaxLife) * time.Second
+	} else {
+		// 使用默认值：10分钟
+		pgConfig.ConnMaxLife = 10 * time.Minute
+	}
+
+	// 初始化数据库连接
+	var pgErr error
+	postgresDB, pgErr = storage.NewPostgresDB(pgConfig)
+	if pgErr != nil {
+		log.Printf("警告: PostgreSQL数据库连接失败: %v", pgErr)
+		log.Println("系统将继续运行，但用户、节点管理等功能可能不可用")
+	} else {
+		// 延迟关闭数据库连接
+		defer func() {
+			if postgresDB != nil {
+				log.Println("关闭PostgreSQL数据库连接...")
+				if err := postgresDB.Close(); err != nil {
+					log.Printf("关闭PostgreSQL连接时出错: %v", err)
+				}
+			}
+		}()
+
+		// 健康检查
+		ctx := context.Background()
+		if err := postgresDB.CheckDatabaseHealth(ctx); err != nil {
+			log.Printf("警告: PostgreSQL数据库健康检查失败: %v", err)
+			log.Println("系统将继续运行，但用户、节点管理等功能可能不可用")
+		} else {
+			// 检查表结构完整性（不执行自动迁移）
+			log.Println("检查数据库表结构完整性...")
+			if err := postgresDB.CheckTablesExist(ctx); err != nil {
+				// 如果配置了自动迁移且表不存在，则执行迁移
+				if serverConfig.Storage.Postgres.AutoMigrate {
+					log.Println("检测到缺少必要的数据库表，将执行自动迁移...")
+					if err := postgresDB.MigrateDatabase(ctx); err != nil {
+						log.Printf("警告: 数据库迁移失败: %v", err)
+						log.Println("系统将继续运行，但用户、节点管理等功能可能不可用")
+					} else {
+						log.Println("数据库迁移成功完成")
+					}
+				} else {
+					log.Printf("警告: 数据库表结构检查失败: %v", err)
+					log.Println("系统将继续运行，但用户、节点管理等功能可能不可用")
+				}
+			} else {
+				log.Println("✓ 数据库所有必需表已存在")
+
+				// 验证表列
+				log.Println("检查数据库表字段完整性...")
+				if err := postgresDB.VerifyTableColumns(ctx); err != nil {
+					log.Printf("警告: 数据库字段检查失败: %v", err)
+					log.Println("系统将继续运行，但用户、节点管理等功能可能不可用")
+				} else {
+					log.Println("✓ 数据库表字段检查通过")
+
+					// 初始化仓库
+					log.Println("初始化数据库仓库...")
+					// 仓库初始化，可选使用，避免未使用变量的警告
+					_ = repository.NewPostgresUserRepository(postgresDB)
+					_ = repository.NewPostgresNodeRepository(postgresDB)
+					_ = repository.NewPostgresNodeGroupRepository(postgresDB)
+					_ = repository.NewPostgresServiceRepository(postgresDB)
+					_ = repository.NewPostgresAlertingRuleRepository(postgresDB)
+					_ = repository.NewPostgresNotificationRepository(postgresDB)
+
+					log.Println("✓ 数据库仓库初始化成功")
+				}
+			}
+		}
+	}
+
+	// 初始化指标存储（用于实时监控数据）
 	switch serverConfig.Storage.Type {
 	case "influxdb":
 		// 优先使用命令行参数，其次使用配置文件
