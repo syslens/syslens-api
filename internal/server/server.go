@@ -273,19 +273,18 @@ func (s *ControlPlaneServer) initRouter() {
 	metricsHandler.WithSecurityConfig(&s.config.Security)
 
 	// 设置路由
-	router := api.SetupRoutes(metricsHandler)
+	apiRouter := api.SetupRoutes(metricsHandler)
 
 	// 添加节点管理API
 	s.router.HandleFunc("/api/v1/nodes/register", s.handleNodeRegister)
-	s.router.HandleFunc("/api/v1/nodes/", s.handleNodeOperations)
+
+	// 将指标处理API委托给apiRouter
+	s.router.Handle("/api/v1/nodes/", apiRouter)
+
+	// 其他管理API
 	s.router.HandleFunc("/api/v1/groups", s.handleGroupOperations)
 	s.router.HandleFunc("/api/v1/services", s.handleServiceOperations)
 	s.router.HandleFunc("/api/v1/ws/nodes", s.handleWebSocket)
-
-	// 将指标处理器的路由添加到主路由
-	s.router.Handle("/api/v1/metrics", router)
-	s.router.Handle("/api/v1/nodes/metrics", router)
-	s.router.Handle("/api/v1/nodes", router)
 
 	// 健康检查
 	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -293,6 +292,17 @@ func (s *ControlPlaneServer) initRouter() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"status":"ok","time":"%s"}`, time.Now().Format(time.RFC3339))
 	})
+
+	// 记录所有注册的路由，帮助调试
+	s.logger.Info("已注册API路由",
+		zap.String("/api/v1/nodes/{nodeID}/metrics", "节点指标上报"),
+		zap.String("/api/v1/nodes/metrics", "获取节点指标"),
+		zap.String("/api/v1/nodes", "获取所有节点"),
+		zap.String("/api/v1/nodes/register", "节点注册"),
+		zap.String("/api/v1/groups", "节点分组管理"),
+		zap.String("/api/v1/services", "服务管理"),
+		zap.String("/api/v1/ws/nodes", "WebSocket连接"),
+		zap.String("/health", "健康检查"))
 }
 
 // Start 启动服务器
