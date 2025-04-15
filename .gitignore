@@ -315,6 +315,6 @@ dist/
 # 忽略tmp目录
 tmp/
 docs/docs.go
-docs/docs.json
+docs/doc.json
 docs/swagger.yaml
 docs/swagger.json
