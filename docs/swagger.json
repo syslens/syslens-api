@@ -848,6 +848,110 @@
                 }
             }
         },
+        "/api/v1/nodes/register": {
+            "post": {
+                "description": "注册一个新节点或更新已存在节点的信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "节点管理"
+                ],
+                "summary": "注册节点",
+                "parameters": [
+                    {
+                        "description": "节点注册信息",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.NodeRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/internal_server_api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_server_api.Node"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "请求错误",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nodes/status": {
+            "put": {
+                "description": "根据节点ID更新节点的状态",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "节点管理"
+                ],
+                "summary": "更新节点状态",
+                "parameters": [
+                    {
+                        "description": "状态更新请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.StatusUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求错误",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/internal_server_api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/nodes/{node_id}/metrics": {
             "post": {
                 "description": "接收并处理节点上报的监控指标数据",
@@ -1631,110 +1735,6 @@
                                     "type": "boolean"
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        },
-        "/nodes/register": {
-            "post": {
-                "description": "注册一个新节点或更新已存在节点的信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "节点管理"
-                ],
-                "summary": "注册节点",
-                "parameters": [
-                    {
-                        "description": "节点注册信息",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.NodeRegisterRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/internal_server_api.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/internal_server_api.Node"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "请求错误",
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "服务器错误",
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/nodes/status": {
-            "put": {
-                "description": "根据节点ID更新节点的状态",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "节点管理"
-                ],
-                "summary": "更新节点状态",
-                "parameters": [
-                    {
-                        "description": "状态更新请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.StatusUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功",
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "请求错误",
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "服务器错误",
-                        "schema": {
-                            "$ref": "#/definitions/internal_server_api.Response"
                         }
                     }
                 }

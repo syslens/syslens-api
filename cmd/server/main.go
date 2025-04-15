@@ -254,9 +254,47 @@ func main() {
 		metricsHandler.WithNodeRepository(nodeRepo)
 	}
 
-	// 初始化zap日志记录器
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
+	// 初始化zap日志记录器 (修改部分)
+	var logger *zap.Logger
+	var zapConfig zap.Config
+	if serverConfig.Env == "development" || serverConfig.Env == "dev" {
+		zapConfig = zap.NewDevelopmentConfig()
+	} else {
+		zapConfig = zap.NewProductionConfig()
+	}
+
+	// 应用配置文件中的日志级别
+	logLevel := zap.InfoLevel // 默认级别
+	switch serverConfig.Logging.Level {
+	case "debug":
+		logLevel = zap.DebugLevel
+	case "info":
+		logLevel = zap.InfoLevel
+	case "warn":
+		logLevel = zap.WarnLevel
+	case "error":
+		logLevel = zap.ErrorLevel
+	}
+	zapConfig.Level = zap.NewAtomicLevelAt(logLevel)
+
+	// 应用配置文件中的日志输出路径
+	if serverConfig.Logging.File != "" {
+		zapConfig.OutputPaths = []string{serverConfig.Logging.File}
+		// 开发环境同时输出到控制台
+		if serverConfig.Env == "development" || serverConfig.Env == "dev" {
+			zapConfig.OutputPaths = append(zapConfig.OutputPaths, "stdout")
+		}
+	} else {
+		// 如果未指定文件，默认输出到stdout
+		zapConfig.OutputPaths = []string{"stdout"}
+	}
+
+	var logErr error
+	logger, logErr = zapConfig.Build()
+	if logErr != nil {
+		log.Fatalf("无法创建 Zap logger: %v", logErr)
+	}
+	defer logger.Sync() // 确保在程序退出时刷新缓冲区
 
 	// 日志安全配置状态
 	if serverConfig.Security.Encryption.Enabled {
