@@ -69,6 +69,7 @@ const (
 		service_id VARCHAR(255) REFERENCES services(id) ON DELETE SET NULL,
 		description TEXT,
 		labels JSONB,
+		configuration JSONB,
 		last_active_at TIMESTAMP WITH TIME ZONE,
 		registered_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 		created_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -259,7 +260,7 @@ func (p *PostgresDB) VerifyTableColumns(ctx context.Context) error {
 		},
 		{
 			tableName: "nodes",
-			columns:   []string{"id", "name", "auth_token_hash", "encrypted_auth_token", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
+			columns:   []string{"id", "name", "auth_token_hash", "encrypted_auth_token", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "configuration", "last_active_at", "registered_at", "created_time", "updated_time", "created_user", "updated_user", "deleted"},
 		},
 		{
 			tableName: "services",
