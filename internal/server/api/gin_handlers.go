@@ -111,7 +111,7 @@ func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 //
 //	@Summary		注册节点
 //	@Description	注册一个新节点或更新已存在节点的信息
-//	@Tags			节点管理
+//	@Tags			nodes
 //	@Accept			json
 //	@Produce		json
 //	@Param			request	body		NodeRegisterRequest	true	"节点注册信息"
@@ -315,19 +315,19 @@ func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 	})
 }
 
-// HandleRetrieveNodeToken godoc
+// HandleGetNodeTokenGin HandleRetrieveNodeToken godoc
 //
-//	@Summary		恢复节点令牌
+//	@Summary		获取节点令牌
 //	@Description	根据节点ID恢复节点的认证令牌
-//	@Tags			节点管理
+//	@Tags			nodes
 //	@Accept			json
 //	@Produce		json
-//	@Param			node_id	path		string	true	"节点ID"
+//	@Param			node_id	path		string													true	"节点ID"
 //	@Success		200		{object}	Response{data=object{node_id=string,auth_token=string}}	"成功"
-//	@Failure		404		{object}	Response			"节点不存在"
-//	@Failure		500		{object}	Response			"服务器错误"
+//	@Failure		404		{object}	Response												"节点不存在"
+//	@Failure		500		{object}	Response												"服务器错误"
 //	@Router			/api/v1/nodes/{node_id}/token [get]
-func (h *MetricsHandler) HandleRetrieveNodeTokenGin(c *gin.Context) {
+func (h *MetricsHandler) HandleGetNodeTokenGin(c *gin.Context) {
 	// 获取节点ID
 	nodeID := c.Param("node_id")
 	if nodeID == "" {
@@ -406,7 +406,7 @@ func (h *MetricsHandler) HandleRetrieveNodeTokenGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{
 		"node_id":    nodeID,
 		"auth_token": string(decryptedBytes),
-		"message":    "节点令牌恢复成功",
+		"message":    "节点令牌获取成功",
 	})
 }
 
@@ -962,7 +962,7 @@ func (h *MetricsHandler) HandleDeleteNotificationGin(c *gin.Context) {
 //
 //	@Summary		更新节点状态
 //	@Description	根据节点ID更新节点的状态
-//	@Tags			节点管理
+//	@Tags			nodes
 //	@Accept			json
 //	@Produce		json
 //	@Param			request	body		StatusUpdateRequest	true	"状态更新请求"
