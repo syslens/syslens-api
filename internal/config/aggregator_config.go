@@ -41,6 +41,9 @@ type AggregatorConfig struct {
 		RetentionHours int `yaml:"retention_hours" json:"retention_hours"`
 	} `yaml:"processing" json:"processing"`
 
+	// 安全配置 (与 Agent/Server 保持一致)
+	Security SecurityConfig `yaml:"security" json:"security"`
+
 	// 日志配置
 	Log struct {
 		// 日志级别
@@ -70,6 +73,13 @@ func DefaultAggregatorConfig() *AggregatorConfig {
 	cfg.Processing.BatchSize = 100
 	cfg.Processing.BatchInterval = 1000
 	cfg.Processing.RetentionHours = 24
+
+	// 安全默认配置
+	cfg.Security.Encryption.Enabled = false // 默认不启用加密
+	cfg.Security.Encryption.Algorithm = "aes-256-gcm"
+	cfg.Security.Compression.Enabled = false // 默认不启用压缩
+	cfg.Security.Compression.Algorithm = "gzip"
+	cfg.Security.Compression.Level = 6
 
 	// 日志默认配置
 	cfg.Log.Level = "info"
@@ -139,6 +149,13 @@ func validateAggregatorConfig(cfg *AggregatorConfig) error {
 
 	if cfg.Processing.RetentionHours <= 0 {
 		return fmt.Errorf("数据保留时间必须大于0")
+	}
+
+	// 验证安全配置 (如果启用)
+	if cfg.Security.Encryption.Enabled {
+		if cfg.Security.Encryption.Key == "" {
+			return fmt.Errorf("加密已启用，但未配置密钥(security.encryption.key)")
+		}
 	}
 
 	return nil
