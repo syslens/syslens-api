@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -195,19 +196,72 @@ func (s *InfluxDBStorage) StoreMetrics(nodeID string, metrics interface{}) error
 	// 异步提交
 	s.writeAPI.Flush()
 
-	log.Printf("已尝试写入数据点: 节点=%s, 指标类型=[cpu=%v,memory=%v,disk=%v,network=%v]",
+	// 记录详细的写入信息
+	metricsTypes := []string{}
+	pointCounts := make(map[string]int)
+
+	if metricsMap["cpu"] != nil {
+		metricsTypes = append(metricsTypes, "cpu")
+		pointCounts["cpu"] = 1
+	}
+	if metricsMap["memory"] != nil {
+		metricsTypes = append(metricsTypes, "memory")
+		pointCounts["memory"] = 1
+	}
+	if diskMap, ok := metricsMap["disk"].(map[string]interface{}); ok {
+		metricsTypes = append(metricsTypes, "disk")
+		if partitions, hasParts := diskMap["partitions"].([]interface{}); hasParts {
+			pointCounts["disk"] = len(partitions)
+		} else {
+			pointCounts["disk"] = 1
+		}
+	}
+	if networkMap, ok := metricsMap["network"].(map[string]interface{}); ok {
+		metricsTypes = append(metricsTypes, "network")
+		pointCounts["network"] = 1
+		if interfaces, hasIfaces := networkMap["interfaces"].(map[string]interface{}); hasIfaces {
+			pointCounts["network_interfaces"] = len(interfaces)
+		}
+	}
+
+	log.Printf("[信息] InfluxDB写入开始 - 节点: %s, 时间戳: %s, 指标类型: %v",
 		nodeID,
-		metricsMap["cpu"] != nil,
-		metricsMap["memory"] != nil,
-		metricsMap["disk"] != nil,
-		metricsMap["network"] != nil)
+		timestamp.Format(time.RFC3339),
+		strings.Join(metricsTypes, ", "))
+
+	// 记录写入的点数
+	totalPoints := 0
+	for _, count := range pointCounts {
+		totalPoints += count
+	}
+
+	log.Printf("[详细] InfluxDB写入点数统计 - 节点: %s, 总点数: %d, 详情: %v",
+		nodeID,
+		totalPoints,
+		pointCounts)
 
 	// 捕获异步写入错误
+	errChan := make(chan error, 1)
+
 	go func() {
 		for err := range s.writeAPI.Errors() {
-			log.Printf("InfluxDB写入错误: %v", err)
+			errChan <- err
+			log.Printf("[错误] InfluxDB写入失败 - 节点: %s, 错误: %v", nodeID, err)
 		}
 	}()
+
+	// 等待一小段时间，让异步错误有机会被捕获
+	select {
+	case err := <-errChan:
+		return fmt.Errorf("InfluxDB写入错误: %w", err)
+	case <-time.After(100 * time.Millisecond):
+		// 继续执行
+	}
+
+	log.Printf("[信息] InfluxDB写入成功 - 节点: %s, 数据点: %d, 指标类型: %v",
+		nodeID,
+		totalPoints,
+		strings.Join(metricsTypes, ", "))
 
 	return nil
 }
