@@ -29,6 +29,23 @@ processing:
   # 数据保留时间（小时）
   retention_hours: 24
 
+# 安全配置 (用于处理来自 Agent 的加密/压缩数据)
+security:
+  # 数据传输加密 (与 Agent 端配置对应)
+  encryption:
+    # 是否启用解密 (如果 Agent 端启用了加密)
+    enabled: false
+    # 加密算法 (必须与 Agent 端一致)
+    algorithm: "aes-256-gcm"
+    # 解密密钥 (必须与 Agent 端一致)
+    key: "${ENCRYPTION_KEY:-default_dev_key}"
+  # 数据压缩 (与 Agent 端配置对应)
+  compression:
+    # 是否启用解压缩 (如果 Agent 端启用了压缩)
+    enabled: false
+    # 压缩算法 (必须与 Agent 端一致)
+    algorithm: "gzip"
+
 # 日志配置
 log:
   # 日志级别：debug, info, warn, error
