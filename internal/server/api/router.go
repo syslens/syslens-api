@@ -72,8 +72,8 @@ func setupNodeRoutes(rg *gin.RouterGroup, handler *MetricsHandler) {
 			// 上报指标
 			nodeGroup.POST("/metrics", handler.HandleMetricsSubmitGin)
 
-			// 恢复节点令牌
-			nodeGroup.GET("/token", handler.HandleRetrieveNodeTokenGin)
+			// 获取节点令牌
+			nodeGroup.GET("/token", handler.HandleGetNodeTokenGin)
 		}
 	}
 
