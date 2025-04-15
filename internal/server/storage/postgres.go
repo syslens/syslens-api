@@ -20,7 +20,7 @@ type PostgresConfig struct {
 	SSLMode      string
 	MaxOpenConns int
 	MaxIdleConns int
-	ConnMaxLife  time.Duration // 连接最大生命周期，time.Duration类型
+	ConnMaxLife  int // 连接最大生命周期，以秒为单位
 	AutoMigrate  bool
 }
 
@@ -52,7 +52,7 @@ func NewPostgresDB(config PostgresConfig) (*PostgresDB, error) {
 		db.SetMaxIdleConns(config.MaxIdleConns)
 	}
 	if config.ConnMaxLife > 0 {
-		db.SetConnMaxLifetime(config.ConnMaxLife)
+		db.SetConnMaxLifetime(time.Duration(config.ConnMaxLife) * time.Second)
 	}
 
 	// 测试连接
