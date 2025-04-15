@@ -5,15 +5,17 @@ import (
 
 	"github.com/syslens/syslens-api/internal/common/utils"
 	"github.com/syslens/syslens-api/internal/config"
+	"github.com/syslens/syslens-api/internal/server/repository"
 	"go.uber.org/zap"
 )
 
 // MetricsHandler 处理指标相关的API请求
 type MetricsHandler struct {
-	storage        MetricsStorage           // 指标存储接口
-	securityConfig *config.SecurityConfig   // 安全配置
-	encryptionSvc  *utils.EncryptionService // 加密服务
-	logger         *zap.Logger              // 日志记录器
+	storage        MetricsStorage            // 指标存储接口
+	securityConfig *config.SecurityConfig    // 安全配置
+	encryptionSvc  *utils.EncryptionService  // 加密服务
+	logger         *zap.Logger               // 日志记录器
+	nodeRepo       repository.NodeRepository // 节点仓库接口
 }
 
 // MetricsStorage 定义了指标存储接口
@@ -59,6 +61,11 @@ func (h *MetricsHandler) WithLogger(logger *zap.Logger) {
 	if logger != nil {
 		h.logger = logger
 	}
+}
+
+// WithNodeRepository 设置节点仓库
+func (h *MetricsHandler) WithNodeRepository(repo repository.NodeRepository) {
+	h.nodeRepo = repo
 }
 
 // processData 处理数据：解密和解压缩
