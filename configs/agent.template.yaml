@@ -32,6 +32,11 @@ aggregator:
   url: "${AGGREGATOR_URL:-http://localhost:8081}"
   # 聚合服务器认证令牌
   auth_token: "${AGGREGATOR_TOKEN:-}"
+  retry_count: 3
+  retry_interval: 1
+  timeout: 15
+  report_interval: 500
+  heartbeat_timeout: 30
 
 # 数据安全配置
 security:
