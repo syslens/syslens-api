@@ -264,44 +264,29 @@ func (s *ControlPlaneServer) initStorage() error {
 
 // initRouter 初始化路由
 func (s *ControlPlaneServer) initRouter() {
-	// 创建路由
-	s.router = http.NewServeMux()
-
 	// 创建指标处理器
 	metricsHandler := api.NewMetricsHandler(s.storage)
 
 	// 应用安全配置
 	metricsHandler.WithSecurityConfig(&s.config.Security)
 
-	// 设置路由
-	apiRouter := api.SetupRoutes(metricsHandler)
+	// 设置日志记录器
+	metricsHandler.WithLogger(s.logger)
 
-	// 添加节点管理API
-	s.router.HandleFunc("/api/v1/nodes/register", s.handleNodeRegister)
+	// 使用Gin路由
+	ginRouter := api.SetupRouter(metricsHandler, s.logger)
 
-	// 将指标处理API委托给apiRouter
-	s.router.Handle("/api/v1/nodes/", apiRouter)
-
-	// 其他管理API
-	s.router.HandleFunc("/api/v1/groups", s.handleGroupOperations)
-	s.router.HandleFunc("/api/v1/services", s.handleServiceOperations)
-	s.router.HandleFunc("/api/v1/ws/nodes", s.handleWebSocket)
-
-	// 健康检查
-	s.router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ok","time":"%s"}`, time.Now().Format(time.RFC3339))
-	})
+	// 创建标准库路由适配
+	s.router = http.NewServeMux()
+	s.router.Handle("/", ginRouter)
 
 	// 记录所有注册的路由，帮助调试
 	s.logger.Info("已注册API路由",
-		zap.String("/api/v1/nodes/{nodeID}/metrics", "节点指标上报"),
-		zap.String("/api/v1/nodes/metrics", "获取节点指标"),
-		zap.String("/api/v1/nodes", "获取所有节点"),
-		zap.String("/api/v1/nodes/register", "节点注册"),
+		zap.String("/api/v1/nodes", "节点管理"),
 		zap.String("/api/v1/groups", "节点分组管理"),
 		zap.String("/api/v1/services", "服务管理"),
+		zap.String("/api/v1/alerts", "告警规则管理"),
+		zap.String("/api/v1/notifications", "通知管理"),
 		zap.String("/api/v1/ws/nodes", "WebSocket连接"),
 		zap.String("/health", "健康检查"))
 }
