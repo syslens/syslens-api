@@ -10,7 +10,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// HandleGetAllNodesGin 获取所有节点
+// HandleGetAllNodesGin godoc
+//
+//	@Summary		获取所有节点
+//	@Description	获取系统中所有注册的节点列表
+//	@Tags			nodes
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	Response{data=[]Node}
+//	@Router			/api/v1/nodes [get]
 func (h *MetricsHandler) HandleGetAllNodesGin(c *gin.Context) {
 	// 获取所有节点ID
 	nodes, err := h.storage.GetAllNodes()
@@ -23,7 +31,20 @@ func (h *MetricsHandler) HandleGetAllNodesGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, nodes)
 }
 
-// HandleGetNodeMetricsGin 获取节点指标
+// HandleGetNodeMetricsGin godoc
+//
+//	@Summary		获取节点指标
+//	@Description	获取指定节点的监控指标数据，支持时间范围查询
+//	@Tags			nodes
+//	@Accept			json
+//	@Produce		json
+//	@Param			node_id	query		string	true	"节点ID"
+//	@Param			start	query		string	false	"开始时间（RFC3339格式）"
+//	@Param			end		query		string	false	"结束时间（RFC3339格式）"
+//	@Success		200		{object}	Response{data=[]NodeMetrics}
+//	@Failure		400		{object}	Response
+//	@Failure		500		{object}	Response
+//	@Router			/api/v1/nodes/metrics [get]
 func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 	// 获取节点ID
 	nodeID := c.Query("node_id")
@@ -71,13 +92,39 @@ func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, metrics)
 }
 
-// HandleNodeRegisterGin 处理节点注册
-func (h *MetricsHandler) HandleNodeRegisterGin(c *gin.Context) {
+// HandleRegisterNodeGin 注册节点
+//
+//	@Summary		注册节点
+//	@Description	注册一个新节点或更新已存在节点的信息
+//	@Tags			节点管理
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		NodeRegisterRequest	true	"节点注册信息"
+//	@Success		200		{object}	Response{data=Node}	"成功"
+//	@Failure		400		{object}	Response			"请求错误"
+//	@Failure		500		{object}	Response			"服务器错误"
+//	@Router			/nodes/register [post]
+func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 	// 处理注册逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "节点注册成功"})
 }
 
-// HandleMetricsSubmitGin 处理节点上报的指标数据
+// HandleMetricsSubmitGin godoc
+//
+//	@Summary		上报节点指标
+//	@Description	接收并处理节点上报的监控指标数据
+//	@Tags			metrics
+//	@Accept			json
+//	@Produce		json
+//	@Param			node_id			path		string	true	"节点ID"
+//	@Param			X-Encrypted		header		string	false	"是否加密(true/false)"
+//	@Param			X-Compressed	header		string	false	"压缩格式(gzip)"
+//	@Param			X-Aggregator-ID	header		string	false	"聚合服务器ID"
+//	@Param			metrics			body		object	true	"指标数据"
+//	@Success		200				{object}	object{message=string,time=string,success=bool}
+//	@Failure		400				{object}	object{error=string,message=string,success=bool}
+//	@Failure		500				{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/nodes/{node_id}/metrics [post]
 func (h *MetricsHandler) HandleMetricsSubmitGin(c *gin.Context) {
 	// 从URL参数获取节点ID
 	nodeID := c.Param("node_id")
@@ -189,26 +236,63 @@ func (h *MetricsHandler) HandleMetricsSubmitGin(c *gin.Context) {
 	})
 }
 
-// HandleWebSocketGin 处理WebSocket连接
+// HandleWebSocketGin godoc
+//
+//	@Summary		WebSocket连接
+//	@Description	建立WebSocket连接，用于实时监控节点指标
+//	@Tags			websocket
+//	@Accept			json
+//	@Produce		json
+//	@Param			node_id	query		string	false	"节点ID"
+//	@Success		200		{object}	object{message=string,success=bool}
+//	@Router			/api/v1/ws/nodes [get]
 func (h *MetricsHandler) HandleWebSocketGin(c *gin.Context) {
 	// WebSocket处理逻辑
 	c.JSON(http.StatusOK, gin.H{"message": "WebSocket端点"})
 }
 
-// 分组相关处理函数
-// HandleGetGroupsGin 获取所有分组
+// HandleGetGroupsGin 分组相关处理函数
+// HandleGetGroupsGin godoc
+//
+//	@Summary		获取所有分组
+//	@Description	获取系统中所有节点分组
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{data=[]object,success=bool}
+//	@Router			/api/v1/groups [get]
 func (h *MetricsHandler) HandleGetGroupsGin(c *gin.Context) {
 	// 获取分组列表逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "获取分组列表"})
 }
 
-// HandleCreateGroupGin 创建分组
+// HandleCreateGroupGin godoc
+//
+//	@Summary		创建分组
+//	@Description	创建新的节点分组
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Param			group	body		object	true	"分组信息"
+//	@Success		201		{object}	object{message=string,success=bool}
+//	@Failure		400		{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/groups [post]
 func (h *MetricsHandler) HandleCreateGroupGin(c *gin.Context) {
 	// 创建分组逻辑
 	RespondWithSuccess(c, http.StatusCreated, gin.H{"message": "创建分组成功"})
 }
 
-// HandleGetGroupGin 获取特定分组
+// HandleGetGroupGin godoc
+//
+//	@Summary		获取分组详情
+//	@Description	获取指定分组的详细信息
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Param			group_id	path		string	true	"分组ID"
+//	@Success		200			{object}	object{group_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/groups/{group_id} [get]
 func (h *MetricsHandler) HandleGetGroupGin(c *gin.Context) {
 	// 获取分组ID
 	groupID := c.Param("group_id")
@@ -216,7 +300,19 @@ func (h *MetricsHandler) HandleGetGroupGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"group_id": groupID, "message": "获取分组详情"})
 }
 
-// HandleUpdateGroupGin 更新分组
+// HandleUpdateGroupGin godoc
+//
+//	@Summary		更新分组
+//	@Description	更新指定分组的信息
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Param			group_id	path		string	true	"分组ID"
+//	@Param			group		body		object	true	"分组更新信息"
+//	@Success		200			{object}	object{group_id=string,message=string,success=bool}
+//	@Failure		400			{object}	object{error=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/groups/{group_id} [put]
 func (h *MetricsHandler) HandleUpdateGroupGin(c *gin.Context) {
 	// 获取分组ID
 	groupID := c.Param("group_id")
@@ -224,7 +320,17 @@ func (h *MetricsHandler) HandleUpdateGroupGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"group_id": groupID, "message": "更新分组成功"})
 }
 
-// HandleDeleteGroupGin 删除分组
+// HandleDeleteGroupGin godoc
+//
+//	@Summary		删除分组
+//	@Description	删除指定的节点分组
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Param			group_id	path		string	true	"分组ID"
+//	@Success		200			{object}	object{group_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/groups/{group_id} [delete]
 func (h *MetricsHandler) HandleDeleteGroupGin(c *gin.Context) {
 	// 获取分组ID
 	groupID := c.Param("group_id")
@@ -232,7 +338,17 @@ func (h *MetricsHandler) HandleDeleteGroupGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"group_id": groupID, "message": "删除分组成功"})
 }
 
-// HandleGetGroupNodesGin 获取分组内的节点
+// HandleGetGroupNodesGin godoc
+//
+//	@Summary		获取分组节点
+//	@Description	获取指定分组中的所有节点
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Param			group_id	path		string	true	"分组ID"
+//	@Success		200			{object}	object{group_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/groups/{group_id}/nodes [get]
 func (h *MetricsHandler) HandleGetGroupNodesGin(c *gin.Context) {
 	// 获取分组ID
 	groupID := c.Param("group_id")
@@ -240,20 +356,48 @@ func (h *MetricsHandler) HandleGetGroupNodesGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"group_id": groupID, "message": "获取分组节点列表"})
 }
 
-// 服务相关处理函数
-// HandleGetServicesGin 获取所有服务
+// HandleGetServicesGin 服务相关处理函数
+// HandleGetServicesGin godoc
+//
+//	@Summary		获取所有服务
+//	@Description	获取系统中所有注册的服务
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{message=string,success=bool}
+//	@Router			/api/v1/services [get]
 func (h *MetricsHandler) HandleGetServicesGin(c *gin.Context) {
 	// 获取服务列表逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "获取服务列表"})
 }
 
-// HandleCreateServiceGin 创建服务
+// HandleCreateServiceGin godoc
+//
+//	@Summary		创建服务
+//	@Description	创建新的服务
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			service	body		object	true	"服务信息"
+//	@Success		201		{object}	object{message=string,success=bool}
+//	@Failure		400		{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/services [post]
 func (h *MetricsHandler) HandleCreateServiceGin(c *gin.Context) {
 	// 创建服务逻辑
 	RespondWithSuccess(c, http.StatusCreated, gin.H{"message": "创建服务成功"})
 }
 
-// HandleGetServiceGin 获取特定服务
+// HandleGetServiceGin godoc
+//
+//	@Summary		获取服务详情
+//	@Description	获取指定服务的详细信息
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			service_id	path		string	true	"服务ID"
+//	@Success		200			{object}	object{service_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/services/{service_id} [get]
 func (h *MetricsHandler) HandleGetServiceGin(c *gin.Context) {
 	// 获取服务ID
 	serviceID := c.Param("service_id")
@@ -261,7 +405,19 @@ func (h *MetricsHandler) HandleGetServiceGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"service_id": serviceID, "message": "获取服务详情"})
 }
 
-// HandleUpdateServiceGin 更新服务
+// HandleUpdateServiceGin godoc
+//
+//	@Summary		更新服务
+//	@Description	更新指定服务的信息
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			service_id	path		string	true	"服务ID"
+//	@Param			service		body		object	true	"服务更新信息"
+//	@Success		200			{object}	object{service_id=string,message=string,success=bool}
+//	@Failure		400			{object}	object{error=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/services/{service_id} [put]
 func (h *MetricsHandler) HandleUpdateServiceGin(c *gin.Context) {
 	// 获取服务ID
 	serviceID := c.Param("service_id")
@@ -269,7 +425,17 @@ func (h *MetricsHandler) HandleUpdateServiceGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"service_id": serviceID, "message": "更新服务成功"})
 }
 
-// HandleDeleteServiceGin 删除服务
+// HandleDeleteServiceGin godoc
+//
+//	@Summary		删除服务
+//	@Description	删除指定的服务
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			service_id	path		string	true	"服务ID"
+//	@Success		200			{object}	object{service_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/services/{service_id} [delete]
 func (h *MetricsHandler) HandleDeleteServiceGin(c *gin.Context) {
 	// 获取服务ID
 	serviceID := c.Param("service_id")
@@ -277,7 +443,17 @@ func (h *MetricsHandler) HandleDeleteServiceGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"service_id": serviceID, "message": "删除服务成功"})
 }
 
-// HandleGetServiceNodesGin 获取服务关联的节点
+// HandleGetServiceNodesGin godoc
+//
+//	@Summary		获取服务节点
+//	@Description	获取指定服务关联的所有节点
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			service_id	path		string	true	"服务ID"
+//	@Success		200			{object}	object{service_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/services/{service_id}/nodes [get]
 func (h *MetricsHandler) HandleGetServiceNodesGin(c *gin.Context) {
 	// 获取服务ID
 	serviceID := c.Param("service_id")
@@ -285,20 +461,48 @@ func (h *MetricsHandler) HandleGetServiceNodesGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"service_id": serviceID, "message": "获取服务节点列表"})
 }
 
-// 告警规则相关处理函数
-// HandleGetAlertsGin 获取所有告警规则
+// HandleGetAlertsGin 告警规则相关处理函数
+// HandleGetAlertsGin godoc
+//
+//	@Summary		获取所有告警规则
+//	@Description	获取系统中所有配置的告警规则
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{message=string,success=bool}
+//	@Router			/api/v1/alerts [get]
 func (h *MetricsHandler) HandleGetAlertsGin(c *gin.Context) {
 	// 获取告警规则列表逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "获取告警规则列表"})
 }
 
-// HandleCreateAlertGin 创建告警规则
+// HandleCreateAlertGin godoc
+//
+//	@Summary		创建告警规则
+//	@Description	创建新的告警规则
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alert	body		object	true	"告警规则信息"
+//	@Success		201		{object}	object{message=string,success=bool}
+//	@Failure		400		{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/alerts [post]
 func (h *MetricsHandler) HandleCreateAlertGin(c *gin.Context) {
 	// 创建告警规则逻辑
 	RespondWithSuccess(c, http.StatusCreated, gin.H{"message": "创建告警规则成功"})
 }
 
-// HandleGetAlertGin 获取特定告警规则
+// HandleGetAlertGin godoc
+//
+//	@Summary		获取告警规则详情
+//	@Description	获取指定告警规则的详细信息
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alert_id	path		string	true	"告警规则ID"
+//	@Success		200			{object}	object{alert_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/alerts/{alert_id} [get]
 func (h *MetricsHandler) HandleGetAlertGin(c *gin.Context) {
 	// 获取告警规则ID
 	alertID := c.Param("alert_id")
@@ -306,7 +510,19 @@ func (h *MetricsHandler) HandleGetAlertGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"alert_id": alertID, "message": "获取告警规则详情"})
 }
 
-// HandleUpdateAlertGin 更新告警规则
+// HandleUpdateAlertGin godoc
+//
+//	@Summary		更新告警规则
+//	@Description	更新指定告警规则的信息
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alert_id	path		string	true	"告警规则ID"
+//	@Param			alert		body		object	true	"告警规则更新信息"
+//	@Success		200			{object}	object{alert_id=string,message=string,success=bool}
+//	@Failure		400			{object}	object{error=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/alerts/{alert_id} [put]
 func (h *MetricsHandler) HandleUpdateAlertGin(c *gin.Context) {
 	// 获取告警规则ID
 	alertID := c.Param("alert_id")
@@ -314,7 +530,17 @@ func (h *MetricsHandler) HandleUpdateAlertGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"alert_id": alertID, "message": "更新告警规则成功"})
 }
 
-// HandleDeleteAlertGin 删除告警规则
+// HandleDeleteAlertGin godoc
+//
+//	@Summary		删除告警规则
+//	@Description	删除指定的告警规则
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alert_id	path		string	true	"告警规则ID"
+//	@Success		200			{object}	object{alert_id=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/alerts/{alert_id} [delete]
 func (h *MetricsHandler) HandleDeleteAlertGin(c *gin.Context) {
 	// 获取告警规则ID
 	alertID := c.Param("alert_id")
@@ -322,7 +548,19 @@ func (h *MetricsHandler) HandleDeleteAlertGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"alert_id": alertID, "message": "删除告警规则成功"})
 }
 
-// HandleUpdateAlertStatusGin 更新告警规则状态
+// HandleUpdateAlertStatusGin godoc
+//
+//	@Summary		更新告警规则状态
+//	@Description	更新指定告警规则的启用状态
+//	@Tags			alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			alert_id	path		string	true	"告警规则ID"
+//	@Param			status		body		object	true	"告警规则状态"
+//	@Success		200			{object}	object{alert_id=string,message=string,success=bool}
+//	@Failure		400			{object}	object{error=string,message=string,success=bool}
+//	@Failure		404			{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/alerts/{alert_id}/status [patch]
 func (h *MetricsHandler) HandleUpdateAlertStatusGin(c *gin.Context) {
 	// 获取告警规则ID
 	alertID := c.Param("alert_id")
@@ -330,14 +568,32 @@ func (h *MetricsHandler) HandleUpdateAlertStatusGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"alert_id": alertID, "message": "更新告警规则状态成功"})
 }
 
-// 通知相关处理函数
-// HandleGetNotificationsGin 获取所有通知
+// HandleGetNotificationsGin 通知相关处理函数
+// HandleGetNotificationsGin godoc
+//
+//	@Summary		获取所有通知
+//	@Description	获取系统中所有通知记录
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{message=string,success=bool}
+//	@Router			/api/v1/notifications [get]
 func (h *MetricsHandler) HandleGetNotificationsGin(c *gin.Context) {
 	// 获取通知列表逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "获取通知列表"})
 }
 
-// HandleGetNotificationGin 获取特定通知
+// HandleGetNotificationGin godoc
+//
+//	@Summary		获取通知详情
+//	@Description	获取指定通知的详细信息
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			notification_id	path		string	true	"通知ID"
+//	@Success		200				{object}	object{notification_id=string,message=string,success=bool}
+//	@Failure		404				{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/notifications/{notification_id} [get]
 func (h *MetricsHandler) HandleGetNotificationGin(c *gin.Context) {
 	// 获取通知ID
 	notificationID := c.Param("notification_id")
@@ -345,7 +601,19 @@ func (h *MetricsHandler) HandleGetNotificationGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"notification_id": notificationID, "message": "获取通知详情"})
 }
 
-// HandleUpdateNotificationStatusGin 更新通知状态
+// HandleUpdateNotificationStatusGin godoc
+//
+//	@Summary		更新通知状态
+//	@Description	更新指定通知的状态
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			notification_id	path		string	true	"通知ID"
+//	@Param			status			body		object	true	"通知状态"
+//	@Success		200				{object}	object{notification_id=string,message=string,success=bool}
+//	@Failure		400				{object}	object{error=string,message=string,success=bool}
+//	@Failure		404				{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/notifications/{notification_id}/status [patch]
 func (h *MetricsHandler) HandleUpdateNotificationStatusGin(c *gin.Context) {
 	// 获取通知ID
 	notificationID := c.Param("notification_id")
@@ -353,7 +621,17 @@ func (h *MetricsHandler) HandleUpdateNotificationStatusGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"notification_id": notificationID, "message": "更新通知状态成功"})
 }
 
-// HandleResolveNotificationGin 解决通知
+// HandleResolveNotificationGin godoc
+//
+//	@Summary		解决通知
+//	@Description	将指定通知标记为已解决
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			notification_id	path		string	true	"通知ID"
+//	@Success		200				{object}	object{notification_id=string,message=string,success=bool}
+//	@Failure		404				{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/notifications/{notification_id}/resolve [post]
 func (h *MetricsHandler) HandleResolveNotificationGin(c *gin.Context) {
 	// 获取通知ID
 	notificationID := c.Param("notification_id")
@@ -361,10 +639,44 @@ func (h *MetricsHandler) HandleResolveNotificationGin(c *gin.Context) {
 	RespondWithSuccess(c, http.StatusOK, gin.H{"notification_id": notificationID, "message": "解决通知成功"})
 }
 
-// HandleDeleteNotificationGin 删除通知
+// HandleDeleteNotificationGin godoc
+//
+//	@Summary		删除通知
+//	@Description	删除指定的通知
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			notification_id	path		string	true	"通知ID"
+//	@Success		200				{object}	object{notification_id=string,message=string,success=bool}
+//	@Failure		404				{object}	object{error=string,message=string,success=bool}
+//	@Router			/api/v1/notifications/{notification_id} [delete]
 func (h *MetricsHandler) HandleDeleteNotificationGin(c *gin.Context) {
 	// 获取通知ID
 	notificationID := c.Param("notification_id")
 	// 删除通知逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"notification_id": notificationID, "message": "删除通知成功"})
+}
+
+// HandleUpdateNodeStatusGin 更新节点状态
+//
+//	@Summary		更新节点状态
+//	@Description	根据节点ID更新节点的状态
+//	@Tags			节点管理
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		StatusUpdateRequest	true	"状态更新请求"
+//	@Success		200		{object}	Response			"成功"
+//	@Failure		400		{object}	Response			"请求错误"
+//	@Failure		500		{object}	Response			"服务器错误"
+//	@Router			/nodes/status [put]
+func (h *MetricsHandler) HandleUpdateNodeStatusGin(c *gin.Context) {
+	// 获取节点状态更新请求
+	var statusUpdateRequest StatusUpdateRequest
+	if err := c.ShouldBindJSON(&statusUpdateRequest); err != nil {
+		RespondWithError(c, http.StatusBadRequest, err, "解析请求数据失败")
+		return
+	}
+
+	// 更新节点状态逻辑
+	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "节点状态更新成功"})
 }
