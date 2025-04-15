@@ -114,7 +114,7 @@ func (h *MetricsHandler) HandleGetNodeMetricsGin(c *gin.Context) {
 //	@Success		200		{object}	Response{data=Node}	"成功"
 //	@Failure		400		{object}	Response			"请求错误"
 //	@Failure		500		{object}	Response			"服务器错误"
-//	@Router			/nodes/register [post]
+//	@Router			/api/v1/nodes/register [post]
 func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 	// 获取请求体
 	var registerRequest struct {
@@ -708,7 +708,7 @@ func (h *MetricsHandler) HandleDeleteNotificationGin(c *gin.Context) {
 //	@Success		200		{object}	Response			"成功"
 //	@Failure		400		{object}	Response			"请求错误"
 //	@Failure		500		{object}	Response			"服务器错误"
-//	@Router			/nodes/status [put]
+//	@Router			/api/v1/nodes/status [put]
 func (h *MetricsHandler) HandleUpdateNodeStatusGin(c *gin.Context) {
 	// 获取节点状态更新请求
 	var statusUpdateRequest StatusUpdateRequest
