@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -23,6 +26,9 @@ import (
 
 // 全局错误日志记录器
 var errorLogger *log.Logger
+
+const maxRegisterRetries = 3
+const registerRetryInterval = 5 * time.Second
 
 func main() {
 	// 解析命令行参数
@@ -92,9 +98,13 @@ func main() {
 
 	// 如果不是调试模式，则初始化上报模块
 	var metricsReporter reporter.Reporter
+	var serverURL string
+	var nodeID string
+	var agentToken string
+
 	if !*debug {
 		// 初始化数据上报模块
-		var serverURL string
+		// var serverURL string // 移除内部声明
 		// 优先使用命令行参数，否则使用配置文件
 		if *serverAddr != "localhost:8080" {
 			// 检查serverAddr是否已包含协议前缀
@@ -106,20 +116,28 @@ func main() {
 		} else if agentConfig.Aggregator.Enabled && agentConfig.Aggregator.URL != "" {
 			// 如果启用了聚合服务器，优先使用聚合服务器地址
 			serverURL = agentConfig.Aggregator.URL
+			agentToken = agentConfig.Aggregator.AuthToken // 获取用于注册的 token
 		} else if agentConfig.Server.URL != "" {
 			serverURL = agentConfig.Server.URL
+			// agentToken = agentConfig.Server.Token // 如果直连主控，理论上也需要token，配置文件里目前没有
 		} else {
 			serverURL = "http://localhost:8080"
+			// agentToken 保持空
 		}
 
 		// 获取主机名作为节点ID
-		nodeID := agentConfig.Node.ID
+		// var nodeID string // 移除内部声明
+		nodeID = agentConfig.Node.ID
 		if nodeID == "" {
 			hostname, err := os.Hostname()
 			if err != nil {
 				hostname = "unknown-node"
+				log.Println("警告: 无法获取主机名，使用 'unknown-node' 作为节点ID")
 			}
 			nodeID = hostname
+			log.Printf("未在配置中指定节点ID，使用主机名: %s", nodeID)
+		} else {
+			log.Printf("使用配置中的节点ID: %s", nodeID)
 		}
 
 		// 创建HTTP上报器并附加安全配置
@@ -128,14 +146,14 @@ func main() {
 			nodeID,
 			reporter.WithRetryCount(agentConfig.Server.RetryCount),
 			reporter.WithRetryInterval(time.Duration(agentConfig.Server.RetryInterval)*time.Second),
-			reporter.WithTimeout(time.Duration(agentConfig.Server.Timeout)*time.Second),
+			reporter.WithTimeout(time.Duration(getAppropriateTimeout(agentConfig, serverURL))*time.Second),
 			reporter.WithSecurityConfig(&agentConfig.Security),
 		)
 
-		// 如果启用了聚合服务器，设置认证令牌
-		if agentConfig.Aggregator.Enabled && agentConfig.Aggregator.AuthToken != "" {
-			httpReporter.SetAuthToken(agentConfig.Aggregator.AuthToken)
-		}
+		// 如果启用了聚合服务器，设置认证令牌 (这个是用于上报指标的，注册时用 agentToken)
+		// if agentConfig.Aggregator.Enabled && agentConfig.Aggregator.AuthToken != "" {
+		// 	httpReporter.SetAuthToken(agentConfig.Aggregator.AuthToken)
+		// }
 
 		metricsReporter = httpReporter
 		log.Printf("数据上报模块初始化完成，目标服务器: %s\n", serverURL)
@@ -152,8 +170,43 @@ func main() {
 		} else {
 			log.Println("数据压缩未启用")
 		}
+
+		// --- 添加注册逻辑 ---
+		registrationSuccessful := false
+		if agentConfig.Aggregator.Enabled {
+			if agentToken != "" {
+				log.Printf("聚合服务器已启用，开始注册节点 %s 到 %s...", nodeID, serverURL)
+				err := attemptRegistration(serverURL, nodeID, agentToken)
+				if err != nil {
+					errorLogger.Printf("向聚合服务器注册失败 (重试 %d 次后): %v", maxRegisterRetries, err)
+					log.Printf("警告: 向聚合服务器注册失败，上报请求可能被拒绝。错误: %v", err)
+					// registrationSuccessful remains false
+				} else {
+					log.Printf("节点 %s 成功注册到聚合服务器 %s", nodeID, serverURL)
+					registrationSuccessful = true
+				}
+			} else {
+				log.Println("警告: 聚合服务器已启用，但未在配置中找到 aggregator.auth_token，无法执行注册。节点将标记为未验证。")
+				// registrationSuccessful remains false
+			}
+		} else {
+			log.Println("聚合服务器未启用，直接连接主控端，跳过聚合器注册。")
+			registrationSuccessful = true // Assume direct connection is allowed for now
+		}
+		log.Printf("节点注册状态: %v", registrationSuccessful) // Log final registration status
+		// --- 注册逻辑结束 ---
+
 	} else {
 		log.Println("调试模式启用，将只打印收集的数据而不上报")
+		// 调试模式也需要 nodeID
+		nodeID = agentConfig.Node.ID
+		if nodeID == "" {
+			hostname, err := os.Hostname()
+			if err != nil {
+				hostname = "unknown-node"
+			}
+			nodeID = hostname
+		}
 	}
 
 	// 设置实际的采集间隔
@@ -185,6 +238,68 @@ func main() {
 	if errFile != nil {
 		errFile.Close()
 	}
+}
+
+// attemptRegistration 尝试向聚合服务器注册 Agent，带重试逻辑
+func attemptRegistration(aggregatorURL, nodeID, token string) error {
+	var lastErr error
+	for i := 0; i <= maxRegisterRetries; i++ {
+		if i > 0 {
+			log.Printf("注册重试 (%d/%d)，等待 %v 后重试...", i, maxRegisterRetries, registerRetryInterval)
+			time.Sleep(registerRetryInterval)
+		}
+		log.Printf("尝试注册 (第 %d 次)...", i+1)
+		err := registerAgentWithAggregator(aggregatorURL, nodeID, token)
+		if err == nil {
+			log.Printf("注册成功 (第 %d 次尝试)", i+1)
+			return nil // 成功
+		}
+		log.Printf("注册尝试 %d 失败: %v", i+1, err)
+		lastErr = err
+	}
+	return fmt.Errorf("注册失败，已重试 %d 次: %w", maxRegisterRetries, lastErr)
+}
+
+// registerAgentWithAggregator 执行单次注册尝试
+func registerAgentWithAggregator(aggregatorURL, nodeID, token string) error {
+	registerURL := fmt.Sprintf("%s/api/v1/nodes/register", aggregatorURL)
+	payload := map[string]string{
+		"node_id": nodeID,
+		"token":   token,
+	}
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("序列化注册负载失败: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) // 注册超时
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", registerURL, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("创建注册请求失败: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "SysLens-Agent/Register")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	log.Printf("发送注册请求到 %s for node %s", registerURL, nodeID)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("注册请求错误 for node %s: %v", nodeID, err)
+		return fmt.Errorf("发送注册请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("收到注册响应 for node %s: Status %d", nodeID, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		log.Printf("注册失败响应体 for node %s: %s", nodeID, string(respBody))
+		return fmt.Errorf("注册请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil // 注册成功
 }
 
 // loadConfig 从文件加载配置并支持环境变量替换
@@ -365,4 +480,17 @@ func saveFailedReportData(stats *collector.SystemStats, timestamp string) {
 	}
 
 	errorLogger.Printf("已保存上报失败的数据到: %s", filename)
+}
+
+// getAppropriateTimeout 获取合适的超时时间
+func getAppropriateTimeout(agentConfig *config.AgentConfig, serverURL string) int {
+	// 如果启用了聚合服务器且URL匹配聚合服务器地址，使用聚合服务器的超时配置
+	if agentConfig.Aggregator.Enabled && strings.Contains(serverURL, strings.TrimPrefix(agentConfig.Aggregator.URL, "${AGGREGATOR_URL:-")) {
+		log.Printf("使用聚合服务器超时配置: %d秒", agentConfig.Aggregator.Timeout)
+		return agentConfig.Aggregator.Timeout
+	}
+
+	// 否则使用主控服务器的超时配置
+	log.Printf("使用主控服务器超时配置: %d秒", agentConfig.Server.Timeout)
+	return agentConfig.Server.Timeout
 }
