@@ -1,0 +1,1241 @@
+basePath: /api/v1
+definitions:
+  internal_server_api.Node:
+    properties:
+      id:
+        example: node-123456
+        type: string
+      ip:
+        example: 192.168.1.100
+        type: string
+      last_reported:
+        example: "2023-06-01T15:30:45Z"
+        type: string
+      name:
+        example: web-server-01
+        type: string
+      status:
+        example: online
+        type: string
+      system:
+        $ref: '#/definitions/internal_server_api.SystemInfo'
+      tags:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  internal_server_api.NodeMetrics:
+    properties:
+      cpu:
+        additionalProperties: true
+        type: object
+      disk:
+        additionalProperties: true
+        type: object
+      memory:
+        additionalProperties: true
+        type: object
+      network:
+        additionalProperties: true
+        type: object
+      node_id:
+        example: node-123456
+        type: string
+      timestamp:
+        example: "2023-06-01T15:30:45Z"
+        type: string
+    type: object
+  internal_server_api.NodeRegisterRequest:
+    properties:
+      features:
+        example:
+        - '[''cpu'''
+        - '''memory'''
+        - '''disk'']'
+        items:
+          type: string
+        type: array
+      ip:
+        example: 192.168.1.100
+        type: string
+      name:
+        example: web-server-01
+        type: string
+      system:
+        $ref: '#/definitions/internal_server_api.SystemInfo'
+      tags:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  internal_server_api.Response:
+    properties:
+      data: {}
+      error:
+        example: 错误信息
+        type: string
+      message:
+        example: 操作成功
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  internal_server_api.StatusUpdateRequest:
+    properties:
+      node_id:
+        example: node-123456
+        type: string
+      reason:
+        example: 系统维护中
+        type: string
+      status:
+        example: offline
+        type: string
+    type: object
+  internal_server_api.SystemInfo:
+    properties:
+      architecture:
+        example: x86_64
+        type: string
+      hostname:
+        example: web-server-01
+        type: string
+      os:
+        example: linux
+        type: string
+      platform:
+        example: Ubuntu
+        type: string
+      version:
+        example: "20.04"
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: SysLens系统主控端API
+  termsOfService: http://swagger.io/terms/
+  title: SysLens API
+  version: "1.0"
+paths:
+  /api/v1/alerts:
+    get:
+      consumes:
+      - application/json
+      description: 获取系统中所有配置的告警规则
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取所有告警规则
+      tags:
+      - alerts
+    post:
+      consumes:
+      - application/json
+      description: 创建新的告警规则
+      parameters:
+      - description: 告警规则信息
+        in: body
+        name: alert
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 创建告警规则
+      tags:
+      - alerts
+  /api/v1/alerts/{alert_id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定的告警规则
+      parameters:
+      - description: 告警规则ID
+        in: path
+        name: alert_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              alert_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 删除告警规则
+      tags:
+      - alerts
+    get:
+      consumes:
+      - application/json
+      description: 获取指定告警规则的详细信息
+      parameters:
+      - description: 告警规则ID
+        in: path
+        name: alert_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              alert_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取告警规则详情
+      tags:
+      - alerts
+    put:
+      consumes:
+      - application/json
+      description: 更新指定告警规则的信息
+      parameters:
+      - description: 告警规则ID
+        in: path
+        name: alert_id
+        required: true
+        type: string
+      - description: 告警规则更新信息
+        in: body
+        name: alert
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              alert_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 更新告警规则
+      tags:
+      - alerts
+  /api/v1/alerts/{alert_id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: 更新指定告警规则的启用状态
+      parameters:
+      - description: 告警规则ID
+        in: path
+        name: alert_id
+        required: true
+        type: string
+      - description: 告警规则状态
+        in: body
+        name: status
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              alert_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 更新告警规则状态
+      tags:
+      - alerts
+  /api/v1/groups:
+    get:
+      consumes:
+      - application/json
+      description: 获取系统中所有节点分组
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  type: object
+                type: array
+              success:
+                type: boolean
+            type: object
+      summary: 获取所有分组
+      tags:
+      - groups
+    post:
+      consumes:
+      - application/json
+      description: 创建新的节点分组
+      parameters:
+      - description: 分组信息
+        in: body
+        name: group
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 创建分组
+      tags:
+      - groups
+  /api/v1/groups/{group_id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定的节点分组
+      parameters:
+      - description: 分组ID
+        in: path
+        name: group_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              group_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 删除分组
+      tags:
+      - groups
+    get:
+      consumes:
+      - application/json
+      description: 获取指定分组的详细信息
+      parameters:
+      - description: 分组ID
+        in: path
+        name: group_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              group_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取分组详情
+      tags:
+      - groups
+    put:
+      consumes:
+      - application/json
+      description: 更新指定分组的信息
+      parameters:
+      - description: 分组ID
+        in: path
+        name: group_id
+        required: true
+        type: string
+      - description: 分组更新信息
+        in: body
+        name: group
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              group_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 更新分组
+      tags:
+      - groups
+  /api/v1/groups/{group_id}/nodes:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定分组中的所有节点
+      parameters:
+      - description: 分组ID
+        in: path
+        name: group_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              group_id:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取分组节点
+      tags:
+      - groups
+  /api/v1/nodes:
+    get:
+      consumes:
+      - application/json
+      description: 获取系统中所有注册的节点列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_server_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_server_api.Node'
+                  type: array
+              type: object
+      summary: 获取所有节点
+      tags:
+      - nodes
+  /api/v1/nodes/{node_id}/metrics:
+    post:
+      consumes:
+      - application/json
+      description: 接收并处理节点上报的监控指标数据
+      parameters:
+      - description: 节点ID
+        in: path
+        name: node_id
+        required: true
+        type: string
+      - description: 是否加密(true/false)
+        in: header
+        name: X-Encrypted
+        type: string
+      - description: 压缩格式(gzip)
+        in: header
+        name: X-Compressed
+        type: string
+      - description: 聚合服务器ID
+        in: header
+        name: X-Aggregator-ID
+        type: string
+      - description: 指标数据
+        in: body
+        name: metrics
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+              time:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 上报节点指标
+      tags:
+      - metrics
+  /api/v1/nodes/metrics:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定节点的监控指标数据，支持时间范围查询
+      parameters:
+      - description: 节点ID
+        in: query
+        name: node_id
+        required: true
+        type: string
+      - description: 开始时间（RFC3339格式）
+        in: query
+        name: start
+        type: string
+      - description: 结束时间（RFC3339格式）
+        in: query
+        name: end
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_server_api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_server_api.NodeMetrics'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 获取节点指标
+      tags:
+      - nodes
+  /api/v1/notifications:
+    get:
+      consumes:
+      - application/json
+      description: 获取系统中所有通知记录
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取所有通知
+      tags:
+      - notifications
+  /api/v1/notifications/{notification_id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定的通知
+      parameters:
+      - description: 通知ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              notification_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 删除通知
+      tags:
+      - notifications
+    get:
+      consumes:
+      - application/json
+      description: 获取指定通知的详细信息
+      parameters:
+      - description: 通知ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              notification_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取通知详情
+      tags:
+      - notifications
+  /api/v1/notifications/{notification_id}/resolve:
+    post:
+      consumes:
+      - application/json
+      description: 将指定通知标记为已解决
+      parameters:
+      - description: 通知ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              notification_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 解决通知
+      tags:
+      - notifications
+  /api/v1/notifications/{notification_id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: 更新指定通知的状态
+      parameters:
+      - description: 通知ID
+        in: path
+        name: notification_id
+        required: true
+        type: string
+      - description: 通知状态
+        in: body
+        name: status
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              notification_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 更新通知状态
+      tags:
+      - notifications
+  /api/v1/services:
+    get:
+      consumes:
+      - application/json
+      description: 获取系统中所有注册的服务
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取所有服务
+      tags:
+      - services
+    post:
+      consumes:
+      - application/json
+      description: 创建新的服务
+      parameters:
+      - description: 服务信息
+        in: body
+        name: service
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 创建服务
+      tags:
+      - services
+  /api/v1/services/{service_id}:
+    delete:
+      consumes:
+      - application/json
+      description: 删除指定的服务
+      parameters:
+      - description: 服务ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              service_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 删除服务
+      tags:
+      - services
+    get:
+      consumes:
+      - application/json
+      description: 获取指定服务的详细信息
+      parameters:
+      - description: 服务ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              service_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取服务详情
+      tags:
+      - services
+    put:
+      consumes:
+      - application/json
+      description: 更新指定服务的信息
+      parameters:
+      - description: 服务ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      - description: 服务更新信息
+        in: body
+        name: service
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              service_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 更新服务
+      tags:
+      - services
+  /api/v1/services/{service_id}/nodes:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定服务关联的所有节点
+      parameters:
+      - description: 服务ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              service_id:
+                type: string
+              success:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: 获取服务节点
+      tags:
+      - services
+  /api/v1/ws/nodes:
+    get:
+      consumes:
+      - application/json
+      description: 建立WebSocket连接，用于实时监控节点指标
+      parameters:
+      - description: 节点ID
+        in: query
+        name: node_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              success:
+                type: boolean
+            type: object
+      summary: WebSocket连接
+      tags:
+      - websocket
+  /nodes/register:
+    post:
+      consumes:
+      - application/json
+      description: 注册一个新节点或更新已存在节点的信息
+      parameters:
+      - description: 节点注册信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_server_api.NodeRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_server_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_server_api.Node'
+              type: object
+        "400":
+          description: 请求错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 注册节点
+      tags:
+      - 节点管理
+  /nodes/status:
+    put:
+      consumes:
+      - application/json
+      description: 根据节点ID更新节点的状态
+      parameters:
+      - description: 状态更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_server_api.StatusUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "400":
+          description: 请求错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 更新节点状态
+      tags:
+      - 节点管理
+swagger: "2.0"
