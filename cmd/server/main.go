@@ -11,8 +11,9 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
-	"time"
 
+	"github.com/syslens/syslens-api/docs"
+	_ "github.com/syslens/syslens-api/docs"
 	"github.com/syslens/syslens-api/internal/config"
 	"github.com/syslens/syslens-api/internal/server/api"
 	"github.com/syslens/syslens-api/internal/server/repository"
@@ -21,7 +22,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//	@title			SysLens API
+//	@version		1.0
+//	@description	SysLens系统主控端API
+//	@termsOfService	http://swagger.io/terms/
+//	@host			localhost:8080
+//	@BasePath		/api/v1
+
 func main() {
+	// 初始化 Swagger 文档
+	docs.SwaggerInfo.Title = "SysLens API"
+	docs.SwaggerInfo.Description = "SysLens系统主控端API"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:8080"
+	docs.SwaggerInfo.BasePath = "/api/v1"
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+
 	// 解析命令行参数
 	configPath := flag.String("config", "configs/server.yaml", "配置文件路径")
 	httpAddr := flag.String("addr", "0.0.0.0:8080", "HTTP服务监听地址")
@@ -112,10 +128,10 @@ func main() {
 	// 设置连接最大生命周期
 	if serverConfig.Storage.Postgres.ConnMaxLife > 0 {
 		// 使用整数秒配置
-		pgConfig.ConnMaxLife = time.Duration(serverConfig.Storage.Postgres.ConnMaxLife) * time.Second
+		pgConfig.ConnMaxLife = serverConfig.Storage.Postgres.ConnMaxLife
 	} else {
-		// 使用默认值：10分钟
-		pgConfig.ConnMaxLife = 10 * time.Minute
+		// 使用默认值：10分钟（600秒）
+		pgConfig.ConnMaxLife = 600
 	}
 
 	// 初始化数据库连接
