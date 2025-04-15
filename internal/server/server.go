@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -318,7 +319,7 @@ func (s *ControlPlaneServer) Start() error {
 		} else {
 			err = s.httpServer.ListenAndServe()
 		}
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("HTTP服务器错误", zap.Error(err))
 		}
 	}()
