@@ -1,8 +1,12 @@
 package aggregator
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"sync"
 	"time"
 
@@ -50,7 +54,10 @@ func NewDataProcessor(cfg *config.AggregatorConfig) *DataProcessor {
 
 // Start 启动数据处理器
 func (p *DataProcessor) Start(ctx context.Context) error {
-	p.ctx = ctx
+	// 创建一个可取消的上下文
+	p.ctx, p.cancel = context.WithCancel(ctx)
+
+	p.logger.Debug("启动数据处理器")
 
 	// 启动指标处理goroutine
 	p.wg.Add(1)
@@ -103,18 +110,151 @@ func (p *DataProcessor) processMetrics() {
 
 // processMetricsData 处理指标数据
 func (p *DataProcessor) processMetricsData() {
-	p.metrics.RLock()
-	defer p.metrics.RUnlock()
+	// 复制当前数据，避免长时间持有锁
+	p.metrics.Lock()
+	metricsSnapshot := make(map[string]map[string]interface{})
+	for nodeID, data := range p.metrics.data {
+		// 深拷贝指标数据
+		metricsCopy := make(map[string]interface{})
+		for k, v := range data {
+			metricsCopy[k] = v
+		}
+		metricsSnapshot[nodeID] = metricsCopy
+	}
+	p.metrics.Unlock()
 
 	// 处理每个节点的指标数据
-	for nodeID, metrics := range p.metrics.data {
-		// 这里可以添加指标数据的处理逻辑
-		// 例如：数据聚合、告警检测等
+	for nodeID, metrics := range metricsSnapshot {
+		// 添加处理时间戳
+		metrics["processed_at"] = time.Now().Unix()
 
-		p.logger.Debug("处理节点指标数据",
-			zap.String("node_id", nodeID),
-			zap.Any("metrics", metrics))
+		// 转发数据到主控平面 - 这里应该调用controlPlaneClient的方法
+		if err := p.forwardMetricsToControlPlane(nodeID, metrics); err != nil {
+			p.logger.Error("转发指标数据到主控平面失败",
+				zap.String("node_id", nodeID),
+				zap.Error(err))
+		} else {
+			p.logger.Debug("成功转发指标数据到主控平面",
+				zap.String("node_id", nodeID))
+		}
 	}
+}
+
+// forwardMetricsToControlPlane 将指标数据转发到主控平面
+func (p *DataProcessor) forwardMetricsToControlPlane(nodeID string, metrics map[string]interface{}) error {
+	// 创建一个子上下文，设置5秒超时
+	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
+	defer cancel()
+
+	// 构建请求URL
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/metrics", p.config.ControlPlane.URL, nodeID)
+	p.logger.Info("准备向主控平面转发指标数据",
+		zap.String("node_id", nodeID),
+		zap.String("url", url),
+		zap.Int("metrics_count", len(metrics)))
+
+	// 构建请求体
+	body, err := json.Marshal(metrics)
+	if err != nil {
+		p.logger.Error("序列化指标数据失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		return fmt.Errorf("序列化指标数据失败: %v", err)
+	}
+	p.logger.Debug("序列化的请求体大小",
+		zap.String("node_id", nodeID),
+		zap.Int("body_size_bytes", len(body)))
+
+	// 创建请求
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		p.logger.Error("创建HTTP请求失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.config.ControlPlane.Token))
+	req.Header.Set("X-Node-ID", nodeID)
+	req.Header.Set("X-Aggregator-ID", "aggregator-1") // 可以设置聚合服务器的ID
+	p.logger.Debug("HTTP请求头设置完成",
+		zap.String("node_id", nodeID),
+		zap.Strings("headers", []string{
+			"Content-Type: application/json",
+			"Authorization: Bearer ****",
+			"X-Node-ID: " + nodeID,
+			"X-Aggregator-ID: aggregator-1",
+		}))
+
+	// 创建HTTP客户端
+	client := &http.Client{
+		Timeout: 5 * time.Second, // 降低超时时间
+		Transport: &http.Transport{
+			MaxIdleConns:          100,              // 最大空闲连接数
+			IdleConnTimeout:       90 * time.Second, // 空闲连接超时时间
+			TLSHandshakeTimeout:   5 * time.Second,  // TLS握手超时
+			ExpectContinueTimeout: 1 * time.Second,  // Expect: 100-continue超时
+			DisableKeepAlives:     false,            // 启用连接复用
+			MaxConnsPerHost:       10,               // 每个主机的最大连接数
+		},
+	}
+
+	// 记录开始时间
+	startTime := time.Now()
+	p.logger.Info("开始发送HTTP请求到主控平面",
+		zap.String("node_id", nodeID),
+		zap.String("url", url),
+		zap.Time("start_time", startTime))
+
+	// 发送请求
+	resp, err := client.Do(req)
+
+	// 记录请求耗时
+	requestTime := time.Since(startTime)
+	p.logger.Info("HTTP请求完成",
+		zap.String("node_id", nodeID),
+		zap.Duration("elapsed", requestTime),
+		zap.Error(err))
+
+	if err != nil {
+		p.logger.Error("向主控平面发送请求失败",
+			zap.String("node_id", nodeID),
+			zap.Duration("elapsed", requestTime),
+			zap.Error(err))
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		p.logger.Error("读取响应体失败",
+			zap.String("node_id", nodeID),
+			zap.Int("status_code", resp.StatusCode),
+			zap.Error(err))
+	} else {
+		p.logger.Info("收到主控平面响应",
+			zap.String("node_id", nodeID),
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("response_body", string(respBody)))
+	}
+
+	// 检查响应状态码
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		p.logger.Error("主控平面返回错误状态码",
+			zap.String("node_id", nodeID),
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("response", string(respBody)))
+		return fmt.Errorf("主控平面返回错误状态码: %d", resp.StatusCode)
+	}
+
+	p.logger.Info("成功向主控平面转发指标数据",
+		zap.String("node_id", nodeID),
+		zap.Int("status_code", resp.StatusCode),
+		zap.Duration("total_time", requestTime))
+	return nil
 }
 
 // GetNodeMetrics 获取节点指标
