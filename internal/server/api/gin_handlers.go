@@ -233,6 +233,11 @@ func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 			LastActiveAt:       sql.NullTime{Time: now, Valid: true},
 		}
 
+		// 初始化默认配置
+		node.Configuration = h.getDefaultNodeConfiguration(&repository.Node{
+			Type: nodeType,
+		})
+
 		// 设置可选字段
 		if registerRequest.GroupID != "" {
 			node.GroupID = sql.NullString{String: registerRequest.GroupID, Valid: true}
@@ -293,6 +298,11 @@ func (h *MetricsHandler) HandleRegisterNodeGin(c *gin.Context) {
 	// 更新最后活动时间
 	now := time.Now()
 	node.LastActiveAt = sql.NullTime{Time: now, Valid: true}
+
+	// 确保节点有配置
+	if node.Configuration == nil || len(node.Configuration) == 0 {
+		node.Configuration = h.getDefaultNodeConfiguration(node)
+	}
 
 	// 保存更新到数据库
 	if err := h.nodeRepo.Update(ctx, node); err != nil {
@@ -980,4 +990,248 @@ func (h *MetricsHandler) HandleUpdateNodeStatusGin(c *gin.Context) {
 
 	// 更新节点状态逻辑
 	RespondWithSuccess(c, http.StatusOK, gin.H{"message": "节点状态更新成功"})
+}
+
+// HandleGetNodeConfigurationGin 获取节点配置
+//
+//	@Summary		获取节点配置
+//	@Description	获取指定节点的配置信息（只需提供token）
+//	@Tags			nodes
+//	@Accept			json
+//	@Produce		json
+//	@Param			Authorization	header		string	true	"节点令牌"
+//	@Success		200				{object}	Response{data=map[string]interface{}}
+//	@Failure		401				{object}	Response	"认证失败"
+//	@Failure		404				{object}	Response	"节点不存在"
+//	@Failure		500				{object}	Response	"服务器错误"
+//	@Router			/api/v1/nodes/configuration [get]
+func (h *MetricsHandler) HandleGetNodeConfigurationGin(c *gin.Context) {
+	// 检查是否配置了节点仓库
+	if h.nodeRepo == nil {
+		h.logger.Error("节点仓库未配置")
+		RespondWithError(c, http.StatusInternalServerError, nil, "系统配置错误，节点仓库未初始化")
+		return
+	}
+
+	// 获取认证令牌
+	token := c.GetHeader("Authorization")
+
+	if token == "" {
+		RespondWithError(c, http.StatusUnauthorized, nil, "缺少认证令牌")
+		return
+	}
+
+	// 根据令牌查找节点
+	ctx := c.Request.Context()
+	node, err := h.nodeRepo.FindByToken(ctx, token)
+	if err != nil {
+		h.logger.Error("根据令牌查找节点失败",
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "验证令牌失败")
+		return
+	}
+
+	if node == nil {
+		RespondWithError(c, http.StatusUnauthorized, nil, "无效的节点令牌")
+		return
+	}
+
+	// 更新节点最后活跃时间
+	if err := h.nodeRepo.UpdateLastActiveAt(ctx, node.ID, time.Now()); err != nil {
+		h.logger.Warn("更新节点最后活跃时间失败",
+			zap.String("node_id", node.ID),
+			zap.Error(err))
+		// 非关键错误，继续处理
+	}
+
+	// 如果节点配置为空，提供默认配置
+	config := node.Configuration
+	if config == nil || len(config) == 0 {
+		config = h.getDefaultNodeConfiguration(node)
+	}
+
+	RespondWithSuccess(c, http.StatusOK, config)
+}
+
+// HandleUpdateNodeConfigurationGin 更新节点配置
+//
+//	@Summary		更新节点配置
+//	@Description	更新指定节点的配置信息
+//	@Tags			nodes
+//	@Accept			json
+//	@Produce		json
+//	@Param			node_id			path		string					true	"节点ID"
+//	@Param			Authorization	header		string					true	"节点令牌"
+//	@Param			config			body		map[string]interface{}	true	"节点配置"
+//	@Success		200				{object}	Response{data=map[string]interface{}}
+//	@Failure		400				{object}	Response	"请求格式错误"
+//	@Failure		401				{object}	Response	"认证失败"
+//	@Failure		404				{object}	Response	"节点不存在"
+//	@Failure		500				{object}	Response	"服务器错误"
+//	@Router			/api/v1/nodes/{node_id}/configuration [put]
+func (h *MetricsHandler) HandleUpdateNodeConfigurationGin(c *gin.Context) {
+	// 检查是否配置了节点仓库
+	if h.nodeRepo == nil {
+		h.logger.Error("节点仓库未配置")
+		RespondWithError(c, http.StatusInternalServerError, nil, "系统配置错误，节点仓库未初始化")
+		return
+	}
+
+	// 获取节点ID和认证令牌
+	nodeID := c.Param("node_id")
+	token := c.GetHeader("Authorization")
+
+	// 这个接口通常只用于管理员操作或节点自身更新
+	// 需要验证节点令牌
+
+	if nodeID == "" {
+		RespondWithError(c, http.StatusBadRequest, nil, "缺少节点ID")
+		return
+	}
+
+	if token == "" {
+		RespondWithError(c, http.StatusUnauthorized, nil, "缺少认证令牌")
+		return
+	}
+
+	// 验证节点和令牌
+	if !h.validateNodeAuthentication(c, nodeID, token) {
+		return // validateNodeAuthentication已设置错误响应
+	}
+
+	// 获取配置数据
+	var configData map[string]any
+	if err := c.ShouldBindJSON(&configData); err != nil {
+		h.logger.Error("解析配置数据失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusBadRequest, err, "请求格式错误")
+		return
+	}
+
+	// 验证节点存在
+	ctx := c.Request.Context()
+	node, err := h.nodeRepo.GetByID(ctx, nodeID)
+	if err != nil {
+		h.logger.Error("获取节点信息失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "获取节点信息失败")
+		return
+	}
+
+	if node == nil {
+		RespondWithError(c, http.StatusNotFound, nil, "节点不存在")
+		return
+	}
+
+	// 验证配置有效性
+	if err := h.validateNodeConfiguration(configData); err != nil {
+		RespondWithError(c, http.StatusBadRequest, err, "配置验证失败")
+		return
+	}
+
+	// 更新配置
+	if err := h.nodeRepo.UpdateConfiguration(ctx, nodeID, configData); err != nil {
+		h.logger.Error("更新节点配置失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "更新节点配置失败")
+		return
+	}
+
+	RespondWithSuccess(c, http.StatusOK, configData)
+}
+
+// 验证节点认证
+func (h *MetricsHandler) validateNodeAuthentication(c *gin.Context, nodeID string, token string) bool {
+	// 如果未提供令牌，拒绝访问
+	if token == "" {
+		RespondWithError(c, http.StatusUnauthorized, nil, "缺少认证令牌")
+		return false
+	}
+
+	// 验证节点令牌
+	ctx := c.Request.Context()
+	valid, err := h.nodeRepo.ValidateNodeToken(ctx, nodeID, token)
+	if err != nil {
+		h.logger.Error("验证节点令牌失败",
+			zap.String("node_id", nodeID),
+			zap.Error(err))
+		RespondWithError(c, http.StatusInternalServerError, err, "验证节点令牌失败")
+		return false
+	}
+
+	if !valid {
+		RespondWithError(c, http.StatusUnauthorized, nil, "无效的节点令牌")
+		return false
+	}
+
+	return true
+}
+
+// 获取默认节点配置
+func (h *MetricsHandler) getDefaultNodeConfiguration(node *repository.Node) map[string]any {
+	// 提供基础配置
+	config := map[string]any{
+		"collection_interval": 60,                                           // 数据采集间隔(秒)
+		"metrics":             []string{"cpu", "memory", "disk", "network"}, // 要采集的指标
+		"log_level":           "info",                                       // 日志级别
+		"buffer_size":         1000,                                         // 缓冲区大小
+		"report_interval":     300,                                          // 上报间隔(秒)
+		"process_monitoring": map[string]any{
+			"enabled":      false,
+			"processes":    []string{},
+			"include_args": false,
+		},
+	}
+
+	// 根据节点类型调整配置
+	if node.Type == repository.NodeTypeFixedService {
+		// 固定服务节点可能需要更频繁的监控
+		config["collection_interval"] = 30
+		config["report_interval"] = 60
+	}
+
+	return config
+}
+
+// 验证节点配置有效性
+func (h *MetricsHandler) validateNodeConfiguration(config map[string]any) error {
+	// 检查必需字段
+	required := []string{"collection_interval", "metrics", "report_interval"}
+	for _, field := range required {
+		if _, exists := config[field]; !exists {
+			return fmt.Errorf("缺少必需的配置字段: %s", field)
+		}
+	}
+
+	// 验证采集间隔
+	if interval, ok := config["collection_interval"].(float64); ok {
+		if interval < 5 {
+			return fmt.Errorf("采集间隔不能小于5秒")
+		}
+	} else {
+		return fmt.Errorf("采集间隔必须是数字")
+	}
+
+	// 验证上报间隔
+	if interval, ok := config["report_interval"].(float64); ok {
+		if interval < 10 {
+			return fmt.Errorf("上报间隔不能小于10秒")
+		}
+	} else {
+		return fmt.Errorf("上报间隔必须是数字")
+	}
+
+	// 验证指标列表
+	if metrics, ok := config["metrics"].([]any); ok {
+		if len(metrics) == 0 {
+			return fmt.Errorf("至少需要一个监控指标")
+		}
+	} else {
+		return fmt.Errorf("监控指标必须是字符串数组")
+	}
+
+	return nil
 }
