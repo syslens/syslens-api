@@ -35,7 +35,7 @@ func main() {
 	docs.SwaggerInfo.Description = "SysLens系统主控端API"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:8080"
-	docs.SwaggerInfo.BasePath = "/api/v1"
+	docs.SwaggerInfo.BasePath = ""
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 
 	// 解析命令行参数
@@ -247,6 +247,12 @@ func main() {
 
 	// 应用安全配置
 	metricsHandler.WithSecurityConfig(&serverConfig.Security)
+
+	// 如果PostgreSQL连接成功，设置节点仓库
+	if postgresDB != nil {
+		nodeRepo := repository.NewPostgresNodeRepository(postgresDB)
+		metricsHandler.WithNodeRepository(nodeRepo)
+	}
 
 	// 初始化zap日志记录器
 	logger, _ := zap.NewProduction()
