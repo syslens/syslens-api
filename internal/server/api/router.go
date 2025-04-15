@@ -63,11 +63,17 @@ func setupNodeRoutes(rg *gin.RouterGroup, handler *MetricsHandler) {
 		// 节点注册
 		nodes.POST("/register", handler.HandleRegisterNodeGin)
 
+		// 更新节点状态
+		nodes.PUT("/status", handler.HandleUpdateNodeStatusGin)
+
 		// 特定节点的操作
 		nodeGroup := nodes.Group("/:node_id")
 		{
 			// 上报指标
 			nodeGroup.POST("/metrics", handler.HandleMetricsSubmitGin)
+
+			// 恢复节点令牌
+			nodeGroup.GET("/token", handler.HandleRetrieveNodeTokenGin)
 		}
 	}
 
