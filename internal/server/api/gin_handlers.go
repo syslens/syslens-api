@@ -20,7 +20,18 @@ import (
 //	@Success		200	{object}	Response{data=[]Node}
 //	@Router			/api/v1/nodes [get]
 func (h *MetricsHandler) HandleGetAllNodesGin(c *gin.Context) {
-	// 获取所有节点ID
+	// 从节点仓库获取所有节点
+	if h.nodeRepo != nil {
+		nodes, err := h.nodeRepo.GetAll(c.Request.Context())
+		if err != nil {
+			RespondWithError(c, http.StatusInternalServerError, err, "获取节点列表失败")
+			return
+		}
+		RespondWithSuccess(c, http.StatusOK, nodes)
+		return
+	}
+
+	// 兼容旧实现，从指标存储中获取节点列表
 	nodes, err := h.storage.GetAllNodes()
 	if err != nil {
 		RespondWithError(c, http.StatusInternalServerError, err, "获取节点列表失败")
