@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/syslens/syslens-api/internal/common/utils"
@@ -59,6 +61,7 @@ func (h *MetricsHandler) WithSecurityConfig(secConfig *config.SecurityConfig) {
 func (h *MetricsHandler) HandleMetricsSubmit(w http.ResponseWriter, r *http.Request) {
 	// 只接受POST请求
 	if r.Method != http.MethodPost {
+		log.Printf("[错误] 不支持的HTTP方法: %s", r.Method)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -66,51 +69,104 @@ func (h *MetricsHandler) HandleMetricsSubmit(w http.ResponseWriter, r *http.Requ
 	// 从请求中获取节点ID
 	nodeID := r.Header.Get("X-Node-ID")
 	if nodeID == "" {
+		log.Printf("[错误] 缺少节点ID头部")
 		http.Error(w, "Missing node ID", http.StatusBadRequest)
 		return
+	}
+
+	// 获取请求发送方IP和聚合服务器ID（如果有）
+	remoteIP := r.RemoteAddr
+	aggregatorID := r.Header.Get("X-Aggregator-ID")
+	source := "直接节点上报"
+	if aggregatorID != "" {
+		source = fmt.Sprintf("聚合服务器(%s)", aggregatorID)
+	}
+
+	log.Printf("[信息] 接收到节点指标上报请求 - 节点ID: %s, 来源: %s, IP: %s", nodeID, source, remoteIP)
+
+	// 检查授权令牌
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		log.Printf("[调试] 授权头部存在: %s", strings.Replace(authHeader, authHeader[10:], "****", 1))
+	} else {
+		log.Printf("[警告] 节点指标上报缺少授权令牌 - 节点ID: %s", nodeID)
 	}
 
 	// 读取请求体
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("[错误] 读取请求体失败 - 节点ID: %s, 错误: %v", nodeID, err)
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
+	log.Printf("[调试] 接收到原始请求体 - 节点ID: %s, 大小: %d字节", nodeID, len(body))
 
 	// 检查是否需要解密和解压缩
 	isEncrypted := r.Header.Get("X-Encrypted") == "true"
 	isCompressed := r.Header.Get("X-Compressed") == "gzip"
+	log.Printf("[调试] 数据处理标记 - 节点ID: %s, 加密: %v, 压缩: %v", nodeID, isEncrypted, isCompressed)
 
 	// 处理数据
+	startProcessing := time.Now()
 	processedData, err := h.processData(body, isEncrypted, isCompressed)
+	processingTime := time.Since(startProcessing)
+
 	if err != nil {
-		log.Printf("数据处理失败: %v", err)
+		log.Printf("[错误] 数据处理失败 - 节点ID: %s, 耗时: %v, 错误: %v", nodeID, processingTime, err)
 		http.Error(w, "Failed to process data", http.StatusBadRequest)
 		return
 	}
+	log.Printf("[信息] 数据处理完成 - 节点ID: %s, 耗时: %v, 处理前大小: %d字节, 处理后大小: %d字节",
+		nodeID, processingTime, len(body), len(processedData))
 
 	// 解析处理后的数据
 	var metrics map[string]interface{}
 	if err := json.Unmarshal(processedData, &metrics); err != nil {
+		log.Printf("[错误] JSON解析失败 - 节点ID: %s, 错误: %v", nodeID, err)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	log.Printf("[信息] 成功解析JSON数据 - 节点ID: %s, 指标数量: %d", nodeID, len(metrics))
 
 	// 添加接收时间戳
-	metrics["received_at"] = time.Now().Unix()
+	receivedAt := time.Now().Unix()
+	metrics["received_at"] = receivedAt
+	log.Printf("[调试] 添加接收时间戳 - 节点ID: %s, 时间戳: %d", nodeID, receivedAt)
+
+	// 记录关键指标（如果存在）
+	if cpu, ok := metrics["cpu"].(map[string]interface{}); ok {
+		if usage, ok := cpu["usage"]; ok {
+			log.Printf("[调试] CPU使用率 - 节点ID: %s, 使用率: %v", nodeID, usage)
+		}
+	}
+	if memory, ok := metrics["memory"].(map[string]interface{}); ok {
+		if used, ok := memory["used_percent"]; ok {
+			log.Printf("[调试] 内存使用率 - 节点ID: %s, 使用率: %v", nodeID, used)
+		}
+	}
 
 	// 存储指标数据
+	startStoring := time.Now()
 	if err := h.storage.StoreMetrics(nodeID, metrics); err != nil {
-		log.Printf("Failed to store metrics: %v", err)
+		log.Printf("[错误] 存储指标数据失败 - 节点ID: %s, 错误: %v", nodeID, err)
 		http.Error(w, "Failed to store metrics", http.StatusInternalServerError)
 		return
 	}
+	storingTime := time.Since(startStoring)
+	log.Printf("[信息] 指标数据存储成功 - 节点ID: %s, 耗时: %v", nodeID, storingTime)
 
 	// 返回成功
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
-	})
+	}); err != nil {
+		log.Printf("[警告] 写入响应失败 - 节点ID: %s, 错误: %v", nodeID, err)
+	}
+
+	// 记录整体处理时间
+	totalTime := time.Since(startProcessing)
+	log.Printf("[信息] 指标上报处理完成 - 节点ID: %s, 总耗时: %v", nodeID, totalTime)
 }
 
 // processData 处理数据：解密和解压缩
