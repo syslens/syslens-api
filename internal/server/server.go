@@ -201,8 +201,16 @@ func NewControlPlaneServer(cfg *config.ServerConfig, logger *zap.Logger) (*Contr
 
 // initLogger 初始化日志记录器
 func (s *ControlPlaneServer) initLogger() error {
-	// 创建日志配置
-	config := zap.NewProductionConfig()
+	var config zap.Config
+
+	// 根据环境选择配置
+	if s.config.Env == "development" || s.config.Env == "dev" {
+		// 开发环境配置 - 输出到控制台并立即同步
+		config = zap.NewDevelopmentConfig()
+	} else {
+		// 生产环境配置
+		config = zap.NewProductionConfig()
+	}
 
 	// 设置日志级别
 	switch s.config.Logging.Level {
@@ -221,6 +229,10 @@ func (s *ControlPlaneServer) initLogger() error {
 	// 设置日志输出
 	if s.config.Logging.File != "" {
 		config.OutputPaths = []string{s.config.Logging.File}
+		// 确保控制台输出在开发环境中始终可用
+		if s.config.Env == "development" || s.config.Env == "dev" {
+			config.OutputPaths = append(config.OutputPaths, "stdout")
+		}
 	}
 
 	// 创建日志记录器
@@ -228,6 +240,9 @@ func (s *ControlPlaneServer) initLogger() error {
 	if err != nil {
 		return fmt.Errorf("创建日志记录器失败: %w", err)
 	}
+
+	// 替换全局logger
+	zap.ReplaceGlobals(logger)
 
 	s.logger = logger
 	return nil
