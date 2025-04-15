@@ -30,19 +30,20 @@ const (
 
 // Node 表示节点实体
 type Node struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	AuthTokenHash string         `json:"-"` // 不在JSON中暴露
-	Labels        map[string]any `json:"labels"`
-	Type          NodeType       `json:"type"`
-	Status        NodeStatus     `json:"status"`
-	GroupID       sql.NullString `json:"group_id,omitempty"`
-	ServiceID     sql.NullString `json:"service_id,omitempty"`
-	Description   sql.NullString `json:"description,omitempty"`
-	RegisteredAt  sql.NullTime   `json:"registered_at,omitempty"`
-	LastActiveAt  sql.NullTime   `json:"last_active_at,omitempty"`
-	CreatedAt     time.Time      `json:"created_time"`
-	UpdatedAt     time.Time      `json:"updated_time"`
+	ID                 string         `json:"id"`
+	Name               string         `json:"name"`
+	AuthTokenHash      string         `json:"-"` // 不在JSON中暴露
+	EncryptedAuthToken string         `json:"-"` // 加密存储的原始令牌，不在JSON中暴露
+	Labels             map[string]any `json:"labels"`
+	Type               NodeType       `json:"type"`
+	Status             NodeStatus     `json:"status"`
+	GroupID            sql.NullString `json:"group_id,omitempty"`
+	ServiceID          sql.NullString `json:"service_id,omitempty"`
+	Description        sql.NullString `json:"description,omitempty"`
+	RegisteredAt       sql.NullTime   `json:"registered_at,omitempty"`
+	LastActiveAt       sql.NullTime   `json:"last_active_at,omitempty"`
+	CreatedAt          time.Time      `json:"created_time"`
+	UpdatedAt          time.Time      `json:"updated_time"`
 }
 
 // NodeRepository 定义节点仓库接口
@@ -103,10 +104,10 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 
 	query := `
 		INSERT INTO nodes (
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 		) RETURNING created_time, updated_time
 	`
 
@@ -117,6 +118,7 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 		node.ID,
 		node.Name,
 		node.AuthTokenHash,
+		node.EncryptedAuthToken,
 		labelsJSON,
 		node.Type,
 		node.Status,
@@ -138,7 +140,7 @@ func (r *PostgresNodeRepository) Create(ctx context.Context, node *Node) error {
 func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -152,6 +154,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 		&node.ID,
 		&node.Name,
 		&node.AuthTokenHash,
+		&node.EncryptedAuthToken,
 		&labelsJSON,
 		&node.Type,
 		&node.Status,
@@ -183,7 +186,7 @@ func (r *PostgresNodeRepository) GetByID(ctx context.Context, id string) (*Node,
 func (r *PostgresNodeRepository) GetAll(ctx context.Context) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -203,7 +206,7 @@ func (r *PostgresNodeRepository) GetAll(ctx context.Context) ([]*Node, error) {
 func (r *PostgresNodeRepository) GetByStatus(ctx context.Context, status NodeStatus) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -224,7 +227,7 @@ func (r *PostgresNodeRepository) GetByStatus(ctx context.Context, status NodeSta
 func (r *PostgresNodeRepository) GetByGroupID(ctx context.Context, groupID string) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -245,7 +248,7 @@ func (r *PostgresNodeRepository) GetByGroupID(ctx context.Context, groupID strin
 func (r *PostgresNodeRepository) GetByServiceID(ctx context.Context, serviceID string) ([]*Node, error) {
 	query := `
 		SELECT 
-			id, name, auth_token_hash, labels, type, status, 
+			id, name, auth_token_hash, encrypted_auth_token, labels, type, status, 
 			group_id, service_id, description, registered_at, last_active_at,
 			created_time, updated_time
 		FROM nodes
@@ -275,14 +278,15 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 		SET 
 			name = $2,
 			auth_token_hash = $3,
-			labels = $4,
-			type = $5,
-			status = $6,
-			group_id = $7,
-			service_id = $8,
-			description = $9,
-			registered_at = $10,
-			last_active_at = $11
+			encrypted_auth_token = $4,
+			labels = $5,
+			type = $6,
+			status = $7,
+			group_id = $8,
+			service_id = $9,
+			description = $10,
+			registered_at = $11,
+			last_active_at = $12
 		WHERE id = $1
 		RETURNING updated_time
 	`
@@ -293,6 +297,7 @@ func (r *PostgresNodeRepository) Update(ctx context.Context, node *Node) error {
 		node.ID,
 		node.Name,
 		node.AuthTokenHash,
+		node.EncryptedAuthToken,
 		labelsJSON,
 		node.Type,
 		node.Status,
@@ -419,6 +424,7 @@ func (r *PostgresNodeRepository) scanNodes(rows *sql.Rows) ([]*Node, error) {
 			&node.ID,
 			&node.Name,
 			&node.AuthTokenHash,
+			&node.EncryptedAuthToken,
 			&labelsJSON,
 			&node.Type,
 			&node.Status,
