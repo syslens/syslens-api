@@ -48,13 +48,17 @@ const (
 	createNodesTable = `
 	CREATE TABLE IF NOT EXISTS nodes (
 		id VARCHAR(255) PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		auth_token_hash VARCHAR(255) NOT NULL,
 		hostname VARCHAR(255),
 		ip_address VARCHAR(50),
+		type VARCHAR(50) NOT NULL,
 		status VARCHAR(50) NOT NULL,
 		group_id UUID REFERENCES node_groups(id) ON DELETE SET NULL,
 		service_id VARCHAR(255) REFERENCES services(id) ON DELETE SET NULL,
+		description TEXT,
 		labels JSONB,
-		last_active TIMESTAMP WITH TIME ZONE,
+		last_active_at TIMESTAMP WITH TIME ZONE,
 		registered_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 	);
@@ -66,6 +70,7 @@ const (
 		name VARCHAR(255) NOT NULL UNIQUE,
 		description TEXT,
 		type VARCHAR(50),
+		critical_metrics JSONB,
 		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 	);
@@ -82,15 +87,17 @@ const (
 	`
 
 	createAlertRulesTable = `
-	CREATE TABLE IF NOT EXISTS alert_rules (
+	CREATE TABLE IF NOT EXISTS alerting_rules (
 		id UUID PRIMARY KEY,
 		name VARCHAR(255) NOT NULL,
 		description TEXT,
-		query TEXT NOT NULL,
+		target_type VARCHAR(50) NOT NULL,
+		target_id VARCHAR(255),
+		metric_query TEXT NOT NULL,
+		duration BIGINT NOT NULL,
 		severity VARCHAR(50) NOT NULL,
-		threshold FLOAT NOT NULL,
-		duration INT NOT NULL,
-		is_active BOOLEAN NOT NULL DEFAULT TRUE,
+		notification_channels JSONB,
+		is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
 		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 	);
@@ -99,15 +106,15 @@ const (
 	createNotificationsTable = `
 	CREATE TABLE IF NOT EXISTS notifications (
 		id UUID PRIMARY KEY,
-		alert_rule_id UUID REFERENCES alert_rules(id) ON DELETE SET NULL,
+		alert_rule_id UUID REFERENCES alerting_rules(id) ON DELETE SET NULL,
 		node_id VARCHAR(255) REFERENCES nodes(id) ON DELETE SET NULL,
-		title VARCHAR(255) NOT NULL,
-		message TEXT NOT NULL,
-		severity VARCHAR(50) NOT NULL,
+		triggered_at TIMESTAMP WITH TIME ZONE NOT NULL,
+		resolved_at TIMESTAMP WITH TIME ZONE,
 		status VARCHAR(50) NOT NULL,
+		severity VARCHAR(50) NOT NULL,
+		details JSONB,
 		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-		resolved_at TIMESTAMP WITH TIME ZONE
+		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 	);
 	`
 )
@@ -181,7 +188,7 @@ func (p *PostgresDB) MigrateDatabase(ctx context.Context) error {
 func (p *PostgresDB) CheckTablesExist(ctx context.Context) error {
 	requiredTables := []string{
 		"users", "user_sessions", "node_groups", "nodes",
-		"services", "service_nodes", "alert_rules", "notifications",
+		"services", "service_nodes", "alerting_rules", "notifications",
 	}
 
 	log.Println("检查数据库表结构...")
@@ -224,23 +231,23 @@ func (p *PostgresDB) VerifyTableColumns(ctx context.Context) error {
 		},
 		{
 			tableName: "nodes",
-			columns:   []string{"id", "hostname", "ip_address", "status", "group_id", "service_id", "labels", "last_active", "registered_at", "updated_at"},
+			columns:   []string{"id", "name", "auth_token_hash", "hostname", "ip_address", "type", "status", "group_id", "service_id", "description", "labels", "last_active_at", "registered_at", "updated_at"},
 		},
 		{
 			tableName: "services",
-			columns:   []string{"id", "name", "description", "type", "created_at", "updated_at"},
+			columns:   []string{"id", "name", "description", "type", "critical_metrics", "created_at", "updated_at"},
 		},
 		{
 			tableName: "service_nodes",
 			columns:   []string{"service_id", "node_id", "priority", "created_at"},
 		},
 		{
-			tableName: "alert_rules",
-			columns:   []string{"id", "name", "description", "query", "severity", "threshold", "duration", "is_active", "created_at", "updated_at"},
+			tableName: "alerting_rules",
+			columns:   []string{"id", "name", "description", "target_type", "target_id", "metric_query", "duration", "severity", "notification_channels", "is_enabled", "created_at", "updated_at"},
 		},
 		{
 			tableName: "notifications",
-			columns:   []string{"id", "alert_rule_id", "node_id", "title", "message", "severity", "status", "created_at", "updated_at", "resolved_at"},
+			columns:   []string{"id", "alert_rule_id", "node_id", "triggered_at", "resolved_at", "status", "severity", "details", "created_at", "updated_at"},
 		},
 	}
 
