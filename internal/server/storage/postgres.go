@@ -10,7 +10,7 @@ import (
 	_ "github.com/lib/pq" // PostgreSQL驱动
 )
 
-// PostgresConfig 定义PostgreSQL配置
+// PostgresConfig 保存PostgreSQL数据库连接配置
 type PostgresConfig struct {
 	Host         string
 	Port         int
@@ -20,7 +20,8 @@ type PostgresConfig struct {
 	SSLMode      string
 	MaxOpenConns int
 	MaxIdleConns int
-	ConnMaxLife  time.Duration
+	ConnMaxLife  time.Duration // 连接最大生命周期，time.Duration类型
+	AutoMigrate  bool
 }
 
 // PostgresDB 提供PostgreSQL数据库连接和操作
