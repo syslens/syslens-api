@@ -14,6 +14,7 @@ import (
 	"github.com/syslens/syslens-api/internal/config"
 	"github.com/syslens/syslens-api/internal/server/api"
 	"github.com/syslens/syslens-api/internal/server/storage"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -112,6 +113,10 @@ func main() {
 	// 应用安全配置
 	metricsHandler.WithSecurityConfig(&serverConfig.Security)
 
+	// 初始化zap日志记录器
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	// 日志安全配置状态
 	if serverConfig.Security.Encryption.Enabled {
 		log.Printf("数据解密已启用，算法: %s", serverConfig.Security.Encryption.Algorithm)
@@ -125,7 +130,7 @@ func main() {
 		log.Println("数据解压缩未启用")
 	}
 
-	router := api.SetupRoutes(metricsHandler)
+	router := api.SetupRouter(metricsHandler, logger)
 	log.Println("API路由初始化完成")
 
 	// 启动HTTP服务
