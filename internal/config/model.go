@@ -111,6 +111,8 @@ type AgentAggregatorConfig struct {
 
 // ServerConfig 主控端配置结构
 type ServerConfig struct {
+	// 运行环境，可选值: development(dev)或production(prod)
+	Env        string                 `yaml:"env"`
 	Server     HTTPServerConfig       `yaml:"server"`
 	Security   SecurityConfig         `yaml:"security"`
 	Storage    StorageConfig          `yaml:"storage"`
