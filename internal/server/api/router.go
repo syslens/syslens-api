@@ -8,6 +8,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/syslens/syslens-api/internal/server/middleware"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // SetupRouter 配置API路由
@@ -41,6 +44,9 @@ func SetupRouter(handler *MetricsHandler, logger *zap.Logger) *gin.Engine {
 		setupNotificationRoutes(api, handler)
 	}
 
+	// 添加Swagger路由
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("http://localhost:8080/swagger/doc.json")))
+
 	return router
 }
 
@@ -55,7 +61,7 @@ func setupNodeRoutes(rg *gin.RouterGroup, handler *MetricsHandler) {
 		nodes.GET("/metrics", handler.HandleGetNodeMetricsGin)
 
 		// 节点注册
-		nodes.POST("/register", handler.HandleNodeRegisterGin)
+		nodes.POST("/register", handler.HandleRegisterNodeGin)
 
 		// 特定节点的操作
 		nodeGroup := nodes.Group("/:node_id")
