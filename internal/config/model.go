@@ -134,6 +134,7 @@ type StorageConfig struct {
 	Memory   MemoryStorage   `yaml:"memory"`
 	File     FileStorage     `yaml:"file"`
 	InfluxDB InfluxDBStorage `yaml:"influxdb"`
+	Postgres PostgresConfig  `yaml:"postgres"`
 }
 
 // MemoryStorage 内存存储配置
@@ -211,4 +212,18 @@ type AggregatorClientConfig struct {
 	HeartbeatTimeout int `yaml:"heartbeat_timeout"`
 	// 数据上报间隔(秒)
 	ReportInterval int `yaml:"report_interval"`
+}
+
+// PostgresConfig PostgreSQL配置
+type PostgresConfig struct {
+	Host         string `yaml:"host"`
+	Port         int    `yaml:"port"`
+	User         string `yaml:"user"`
+	Password     string `yaml:"password"`
+	DBName       string `yaml:"dbname"`
+	SSLMode      string `yaml:"sslmode"`
+	MaxOpenConns int    `yaml:"max_open_conns"`
+	MaxIdleConns int    `yaml:"max_idle_conns"`
+	ConnMaxLife  int    `yaml:"conn_max_life"` // 秒
+	AutoMigrate  bool   `yaml:"auto_migrate"`  // 是否自动迁移表结构
 }
