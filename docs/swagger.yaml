@@ -728,6 +728,71 @@ paths:
       summary: 获取节点指标
       tags:
       - nodes
+  /api/v1/nodes/register:
+    post:
+      consumes:
+      - application/json
+      description: 注册一个新节点或更新已存在节点的信息
+      parameters:
+      - description: 节点注册信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_server_api.NodeRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_server_api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_server_api.Node'
+              type: object
+        "400":
+          description: 请求错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 注册节点
+      tags:
+      - 节点管理
+  /api/v1/nodes/status:
+    put:
+      consumes:
+      - application/json
+      description: 根据节点ID更新节点的状态
+      parameters:
+      - description: 状态更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_server_api.StatusUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "400":
+          description: 请求错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/internal_server_api.Response'
+      summary: 更新节点状态
+      tags:
+      - 节点管理
   /api/v1/notifications:
     get:
       consumes:
@@ -1173,69 +1238,4 @@ paths:
       summary: WebSocket连接
       tags:
       - websocket
-  /nodes/register:
-    post:
-      consumes:
-      - application/json
-      description: 注册一个新节点或更新已存在节点的信息
-      parameters:
-      - description: 节点注册信息
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/internal_server_api.NodeRegisterRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功
-          schema:
-            allOf:
-            - $ref: '#/definitions/internal_server_api.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/internal_server_api.Node'
-              type: object
-        "400":
-          description: 请求错误
-          schema:
-            $ref: '#/definitions/internal_server_api.Response'
-        "500":
-          description: 服务器错误
-          schema:
-            $ref: '#/definitions/internal_server_api.Response'
-      summary: 注册节点
-      tags:
-      - 节点管理
-  /nodes/status:
-    put:
-      consumes:
-      - application/json
-      description: 根据节点ID更新节点的状态
-      parameters:
-      - description: 状态更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/internal_server_api.StatusUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功
-          schema:
-            $ref: '#/definitions/internal_server_api.Response'
-        "400":
-          description: 请求错误
-          schema:
-            $ref: '#/definitions/internal_server_api.Response'
-        "500":
-          description: 服务器错误
-          schema:
-            $ref: '#/definitions/internal_server_api.Response'
-      summary: 更新节点状态
-      tags:
-      - 节点管理
 swagger: "2.0"
