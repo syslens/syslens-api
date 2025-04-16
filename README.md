@@ -10,8 +10,8 @@ SysLens是一个分布式服务器监控系统，由主控端和节点端组成�
 
 ## 访问量
 
-![Profile views counter](https://komarev.com/ghpvc/?username=syslens&style=flat&color=blue) 
-[![Visitor Count](https://profile-counter.glitch.me/syslens/syslens-api/count.svg)](https://github.com/syslens/syslens-api)
+![Visitor Count 1](https://komarev.com/ghpvc/?username=syslens&style=flat&color=blue) 
+![Visitor Count 2](https://profile-counter.glitch.me/syslens/syslens-api/count.svg)
 
 ## 功能特点
 
