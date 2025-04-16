@@ -2,6 +2,14 @@
 
 SysLens是一个分布式服务器监控系统，由主控端和节点端组成，可实时监控和分析多服务器环境的系统指标。
 
+![版本](https://img.shields.io/badge/版本-1.1.0-blue) ![开发工具](https://img.shields.io/badge/IDE-VSCode-green) ![Go](https://img.shields.io/badge/Go-1.24+-success) ![Gin](https://img.shields.io/badge/Gin-1.10+-blueviolet) ![InfluxDB](https://img.shields.io/badge/InfluxDB-2.x-informational) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue) ![Docker](https://img.shields.io/badge/Docker-blue)
+
+[![GitHub stars](https://img.shields.io/github/stars/syslens/syslens-api)](https://github.com/syslens/syslens-api/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/syslens/syslens-api)](https://github.com/syslens/syslens-api/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/syslens/syslens-api)](https://github.com/syslens/syslens-api/issues)
+
+![Visitor Count](https://profile-counter.glitch.me/syslens/syslens-api/count.svg)
+
 ## 功能特点
 
 - **毫秒级监控**：支持500毫秒以上的高频数据采集
@@ -509,3 +517,7 @@ git pull origin main
 make build-all
 # 停止旧服务，启动新服务
 ```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=syslens/syslens-api&type=Date)](https://www.star-history.com/#syslens/syslens-api&Date)
